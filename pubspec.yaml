@@ -1,0 +1,38 @@
+name: batak_app
+description: "Likya Batak card game application"
+publish_to: "none"
+version: 1.0.9+10
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2
+  google_mobile_ads: ^5.1.0
+  in_app_purchase: ^3.2.0
+  shared_preferences: ^2.2.3
+  audioplayers: ^6.0.0
+  web_socket_channel: ^3.0.1
+  http: ^1.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/sounds/
+    - assets/images/
+    - assets/cards/
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon.png"
+  min_sdk_android: 21 # Uygulamanın minimum Android sürümü
