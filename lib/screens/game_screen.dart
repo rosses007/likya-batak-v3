@@ -10,6 +10,7 @@ import '../widgets/fanned_hand_view.dart';
 import '../widgets/exposed_dummy_hand.dart';
 import '../widgets/game_action_panels.dart';
 import '../widgets/settings_dialog.dart';
+import '../widgets/consent_banner.dart';
 import '../widgets/scoreboard_dialog.dart';
 
 class BatakGameScreen extends StatefulWidget {
@@ -486,11 +487,7 @@ class _BatakGameScreenState extends State<BatakGameScreen>
                         ),
                       ),
                     ),
-                    Container(
-                      height: 50,
-                      width: double.infinity,
-                      color: const Color(0xFF0D0D0D),
-                    ),
+                    const ConsentBanner(),
                   ],
                 );
               },

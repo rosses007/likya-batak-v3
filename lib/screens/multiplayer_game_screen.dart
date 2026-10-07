@@ -6,6 +6,7 @@ import '../models/player_model.dart';
 import '../services/ad_service.dart';
 import '../screens/main_menu_screen.dart';
 import '../providers/store_provider.dart';
+import '../widgets/consent_banner.dart';
 
 class MultiplayerGameScreen extends StatefulWidget {
   const MultiplayerGameScreen({super.key});
@@ -15,14 +16,19 @@ class MultiplayerGameScreen extends StatefulWidget {
 }
 
 class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
+  StoreProvider? _store;
   
   @override
   void initState() {
     super.initState();
+    AdService.instance.addListener(_tryLoadInterstitial);
     // Load interstitial ad when the user sits at the table
-    AdService.loadInterstitialAd();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _store = context.read<StoreProvider>();
+      _store!.addListener(_tryLoadInterstitial);
+      _tryLoadInterstitial();
       final provider = Provider.of<MultiplayerGameProvider>(context, listen: false);
       provider.onGameFinished = () {
         if (mounted) {
@@ -30,6 +36,19 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
         }
       };
     });
+  }
+
+  void _tryLoadInterstitial() {
+    if (!mounted) return;
+    final store = context.read<StoreProvider>();
+    AdService.instance.loadInterstitialAd(isVip: !store.vipStatusLoaded || store.isVip);
+  }
+
+  @override
+  void dispose() {
+    AdService.instance.removeListener(_tryLoadInterstitial);
+    _store?.removeListener(_tryLoadInterstitial);
+    super.dispose();
   }
 
   void _returnToMainMenu() {
@@ -46,8 +65,10 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
       );
     } else {
       // VIP değilse reklam göster
-      AdService.showInterstitialAd(
+      AdService.instance.showInterstitialAd(
+        isVip: false,
         onAdDismissed: () {
+          if (!mounted) return;
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const MainMenuScreen()),
             (Route<dynamic> route) => false,
@@ -308,21 +329,7 @@ class _MultiplayerGameScreenState extends State<MultiplayerGameScreen> {
                 if (store.isVip) {
                   return const SizedBox.shrink();
                 }
-                return Container(
-                  height: 60,
-                  width: double.infinity,
-                  color: Colors.black,
-                  alignment: Alignment.center,
-                  child: const Text(
-                    "REKLAM ALANI",
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                );
+                return const ConsentBanner();
               },
             ),
           ],

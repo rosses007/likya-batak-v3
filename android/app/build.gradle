@@ -15,6 +15,24 @@ if (localPropertiesFile.exists()) {
 def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '1'
 def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0'
 
+def dartDefines = [:]
+if (project.hasProperty('dart-defines')) {
+    project.property('dart-defines').split(',').each { encoded ->
+        def decoded = new String(encoded.decodeBase64(), 'UTF-8')
+        def separator = decoded.indexOf('=')
+        if (separator > 0) dartDefines[decoded.substring(0, separator)] = decoded.substring(separator + 1)
+    }
+}
+def releaseAppId = dartDefines['ADMOB_APP_ID_ANDROID'] ?: ''
+def releaseBannerId = dartDefines['ADMOB_BANNER_ANDROID'] ?: ''
+def samplePublisher = 'ca-app-pub-3940256099942544'
+def validAppId = { id -> id ==~ /ca-app-pub-\d{16}~\d+/ && !id.startsWith(samplePublisher) }
+def validUnitId = { id -> id ==~ /ca-app-pub-\d{16}\/\d+/ && !id.startsWith(samplePublisher) }
+if (gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') } &&
+        (!validAppId(releaseAppId) || !validUnitId(releaseBannerId))) {
+    throw new GradleException('Release requires real ADMOB_APP_ID_ANDROID and ADMOB_BANNER_ANDROID dart-defines; sample IDs are rejected.')
+}
+
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
@@ -53,7 +71,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            manifestPlaceholders = [admobAppId: 'ca-app-pub-3940256099942544~3347511713']
+        }
         release {
+            manifestPlaceholders = [admobAppId: validAppId(releaseAppId) ? releaseAppId : 'MISSING_PRODUCTION_ADMOB_APP_ID']
             signingConfig = signingConfigs.release
             minifyEnabled false
             shrinkResources false

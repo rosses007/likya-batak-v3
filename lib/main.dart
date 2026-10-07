@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart'; // Added for AdMob
+import 'services/ad_service.dart';
 
 import 'providers/game_provider.dart';
 import 'providers/multiplayer_game_provider.dart'; // Added Multiplayer provider
@@ -12,9 +12,6 @@ Future<void> main() async {
   // Initialize Flutter bindings
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize AdMob SDK
-  await MobileAds.instance.initialize();
-
   runApp(
     MultiProvider(
       providers: [
@@ -25,6 +22,7 @@ Future<void> main() async {
       child: const BatakApp(),
     ),
   );
+  AdService.instance.start();
 }
 
 class BatakApp extends StatelessWidget {

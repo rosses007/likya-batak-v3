@@ -24,6 +24,8 @@ class FakeStore extends ChangeNotifier implements StoreProvider {
   @override
   bool isVip = false;
   @override
+  bool vipStatusLoaded = true;
+  @override
   List<ProductDetails> products = [];
   @override
   void buyVip() {}

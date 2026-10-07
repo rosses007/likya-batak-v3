@@ -8,6 +8,7 @@ class StoreProvider extends ChangeNotifier {
   late StreamSubscription<List<PurchaseDetails>> _subscription;
 
   bool isVip = false;
+  bool vipStatusLoaded = false;
   List<ProductDetails> products = [];
   
   // Mağazalarda oluşturulabilecek abonelik ürün kimlikleri
@@ -26,6 +27,7 @@ class StoreProvider extends ChangeNotifier {
   Future<void> _loadVipStatus() async {
     final prefs = await SharedPreferences.getInstance();
     isVip = prefs.getBool('isVip') ?? false;
+    vipStatusLoaded = true;
     notifyListeners();
   }
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/sound_service.dart';
 import '../providers/game_provider.dart';
+import '../services/ad_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsDialog extends StatefulWidget {
   final List<String> currentNames;
@@ -10,6 +12,7 @@ class SettingsDialog extends StatefulWidget {
   final BatakGameMode gameMode;
   final HandLayoutMode handLayoutMode;
   final TableColor tableColor;
+  final AdService? adService;
   final Function({
     required List<String> names,
     required bool sortAscending,
@@ -30,6 +33,7 @@ class SettingsDialog extends StatefulWidget {
     required this.handLayoutMode,
     required this.tableColor,
     required this.onSave,
+    this.adService,
   });
 
   @override
@@ -37,6 +41,22 @@ class SettingsDialog extends StatefulWidget {
 }
 
 class _SettingsDialogState extends State<SettingsDialog> {
+  AdService get _ads => widget.adService ?? AdService.instance;
+  static final Uri _privacyPolicy = Uri.parse('https://likyabatak.netlify.app/privacy/');
+
+  Future<void> _openPrivacyPolicy() async {
+    try {
+      if (!await launchUrl(_privacyPolicy, mode: LaunchMode.externalApplication)) {
+        throw StateError('Browser unavailable');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gizlilik politikası açılamadı.')),
+      );
+    }
+  }
+
   late List<TextEditingController> _nameControllers;
   late bool _sortAscending;
   late double _speed;
@@ -366,6 +386,21 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
               const SizedBox(height: 12),
 
+              TextButton.icon(
+                onPressed: _openPrivacyPolicy,
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Gizlilik Politikası'),
+              ),
+              AnimatedBuilder(
+                animation: _ads,
+                builder: (context, _) => _ads.privacyOptionsRequired
+                    ? TextButton.icon(
+                        onPressed: _ads.showPrivacyOptions,
+                        icon: const Icon(Icons.privacy_tip_outlined),
+                        label: const Text('Gizlilik Seçenekleri'),
+                      )
+                    : const SizedBox.shrink(),
+              ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF6B3212),
