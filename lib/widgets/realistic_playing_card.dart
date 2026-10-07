@@ -103,9 +103,7 @@ class RealisticPlayingCardWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
-        curve: Curves.easeOutCubic,
+      child: Container(
         width: w,
         height: h,
         decoration: BoxDecoration(

@@ -89,8 +89,8 @@ class GameProvider extends ChangeNotifier {
   bool sortAscending = true;
   double gameSpeed = 1.2; // Hızlı ve seri akış
 
-  // Hızlı bot gecikmesi (300ms - 400ms civarı)
-  int get delayBase => (380 / gameSpeed).round();
+  // Kısa, okunabilir bot ritmi; hız ayarı korunur.
+  int get delayBase => (240 / gameSpeed).round().clamp(120, 400);
 
   // --- LIKYA-V2-002: ASYNC YAŞAM DÖNGÜSÜ & KİLİT KORUMASI ---
   int _gameGeneration = 0;
@@ -599,14 +599,8 @@ class GameProvider extends ChangeNotifier {
       trickNumber: trickNumber,
     );
 
-    // Gerçekçi kart atma sesi
-    await SoundService.playCardThrow();
-
-    if (_isDisposed || generation != _gameGeneration) {
-      return const GameActionResult.success();
-    }
-
-    _safeNotifyListeners();
+    // Ses kartın masada görünmesini ve sıranın ilerlemesini bekletmez.
+    unawaited(SoundService.playCardThrow());
 
     if (tableCards.length == 4) {
       currentPhase = GamePhase.trickFinished;
@@ -614,7 +608,7 @@ class GameProvider extends ChangeNotifier {
       _safeNotifyListeners();
 
       _trickResolutionTimer?.cancel();
-      _trickResolutionTimer = Timer(Duration(milliseconds: (delayBase * 1.6).round()), () async {
+      _trickResolutionTimer = Timer(Duration(milliseconds: (delayBase * 1.5).round()), () async {
         if (_isDisposed || generation != _gameGeneration) return;
         try {
           int actualWinnerIdx = GameEngine.determineTrickWinnerPlayerIndex(
@@ -625,7 +619,7 @@ class GameProvider extends ChangeNotifier {
 
           players[actualWinnerIdx].tricksWon++;
 
-          await SoundService.playChipsCollect();
+          unawaited(SoundService.playChipsCollect());
 
           if (_isDisposed || generation != _gameGeneration) return;
 

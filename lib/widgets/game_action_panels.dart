@@ -39,6 +39,37 @@ class BiddingKeypadWidget extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Pas Butonu
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onPass,
+                borderRadius: BorderRadius.circular(8),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3E1F18),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF8B4715), width: 1.2),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      "PAS",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -79,36 +110,6 @@ class BiddingKeypadWidget extends StatelessWidget {
             }),
           ),
           const SizedBox(height: 10),
-          // Pas Butonu
-          SizedBox(
-            width: double.infinity,
-            height: 40,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: onPass,
-                borderRadius: BorderRadius.circular(8),
-                child: Ink(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3E1F18),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF8B4715), width: 1.2),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      "PAS",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );

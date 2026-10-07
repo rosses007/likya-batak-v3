@@ -7,7 +7,7 @@ import 'realistic_playing_card.dart';
 ///
 /// Kart sayısı > 8 ise: 2 katmanlı üst üste binen çapraz yelpaze (Üst katmanda en fazla 8, alt katmanda kalanlar).
 /// Kart sayısı <= 8 ise: Tek sıra zarif çapraz yelpaze.
-class FannedHandView extends StatefulWidget {
+class FannedHandView extends StatelessWidget {
   final List<PlayingCard> hand;
   final bool isMyTurn;
   final bool Function(PlayingCard card) isCardValid;
@@ -24,34 +24,18 @@ class FannedHandView extends StatefulWidget {
   });
 
   @override
-  State<FannedHandView> createState() => _FannedHandViewState();
-}
-
-class _FannedHandViewState extends State<FannedHandView> {
-  PlayingCard? _selectedCard;
-
-  @override
-  void didUpdateWidget(covariant FannedHandView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Sıra değiştiğinde veya kart oynandığında seçimi sıfırla
-    if (!widget.isMyTurn ||
-        (_selectedCard != null && !widget.hand.contains(_selectedCard))) {
-      _selectedCard = null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (widget.hand.isEmpty) {
+    if (hand.isEmpty) {
       return const SizedBox(height: 150);
     }
 
-    List<PlayingCard> sortedHand = List.from(widget.hand);
+    List<PlayingCard> sortedHand = List.from(hand);
     sortedHand.sort((a, b) {
       if (a.suit != b.suit) {
         return a.suit.index.compareTo(b.suit.index);
       }
-      return widget.sortAscending
+      return sortAscending
           ? a.power.compareTo(b.power)
           : b.power.compareTo(a.power);
     });
@@ -65,6 +49,7 @@ class _FannedHandViewState extends State<FannedHandView> {
         // Kart sayısı <= 8 ise tek sıra zarif yelpaze
         if (count <= 8) {
           return _buildSingleRowFan(
+            context: context,
             sortedHand: sortedHand,
             maxWidth: maxWidth,
           );
@@ -72,6 +57,7 @@ class _FannedHandViewState extends State<FannedHandView> {
 
         // Kart sayısı > 8 ise 2 katmanlı çapraz yelpaze (8 + 8 Stacked)
         return _buildTwoLayerStackedFan(
+          context: context,
           sortedHand: sortedHand,
           maxWidth: maxWidth,
         );
@@ -81,11 +67,12 @@ class _FannedHandViewState extends State<FannedHandView> {
 
   /// TEK SIRA ZARİF YELPAZE (Elde 8 veya daha az kart kaldığında)
   Widget _buildSingleRowFan({
+    required BuildContext context,
     required List<PlayingCard> sortedHand,
     required double maxWidth,
   }) {
     int count = sortedHand.length;
-    double cardWidth = (maxWidth * 0.22).clamp(84.0, 116.0);
+    double cardWidth = (maxWidth * 0.23).clamp(84.0, 120.0);
     double cardHeight = cardWidth * 1.42;
 
     double availableWidth = maxWidth - cardWidth - 12;
@@ -101,12 +88,10 @@ class _FannedHandViewState extends State<FannedHandView> {
     double maxAngle = math.min(0.09, 0.010 * (count - 1));
     double angleStep = (count > 1) ? (2 * maxAngle / (count - 1)) : 0;
 
-    List<Widget> unselectedCards = [];
-    Widget? selectedCardWidget;
+    List<Widget> cards = [];
 
     for (int index = 0; index < count; index++) {
       final card = sortedHand[index];
-      final isSelected = _selectedCard == card;
 
       double centerOffset =
           (count > 1) ? (index - (count - 1) / 2.0) : 0;
@@ -114,7 +99,7 @@ class _FannedHandViewState extends State<FannedHandView> {
       double curveY = (centerOffset * centerOffset) * 0.18;
 
       double leftPos = startX + index * spacing;
-      double bottomPos = 12 - curveY + (isSelected ? 22 : 0);
+      double bottomPos = 12 - curveY;
 
       final cardWidget = Positioned(
         key: ValueKey('single_${card.suit.name}_${card.rank.name}'),
@@ -123,15 +108,11 @@ class _FannedHandViewState extends State<FannedHandView> {
         child: Transform.rotate(
           angle: angle,
           alignment: Alignment.bottomCenter,
-          child: _buildCardWidget(card, cardWidth, cardHeight, isSelected),
+          child: _buildCardWidget(context, card, cardWidth, cardHeight),
         ),
       );
 
-      if (isSelected) {
-        selectedCardWidget = cardWidget;
-      } else {
-        unselectedCards.add(cardWidget);
-      }
+      cards.add(cardWidget);
     }
 
     return SizedBox(
@@ -141,8 +122,7 @@ class _FannedHandViewState extends State<FannedHandView> {
         clipBehavior: Clip.none,
         alignment: Alignment.bottomCenter,
         children: [
-          ...unselectedCards,
-          if (selectedCardWidget != null) selectedCardWidget,
+          ...cards,
         ],
       ),
     );
@@ -154,6 +134,7 @@ class _FannedHandViewState extends State<FannedHandView> {
   /// Alt katman: Kalan kartlar (Ön katmanda hafif altta)
   /// Her iki katman da düz ızgara değil, zarif çapraz yelpaze açısına ve kavis derinliğine sahiptir.
   Widget _buildTwoLayerStackedFan({
+    required BuildContext context,
     required List<PlayingCard> sortedHand,
     required double maxWidth,
   }) {
@@ -167,7 +148,7 @@ class _FannedHandViewState extends State<FannedHandView> {
     List<PlayingCard> bottomCards = sortedHand.sublist(topCount);
 
     // Kart boyutlandırması
-    double cardWidth = (maxWidth * 0.205).clamp(72.0, 96.0);
+    double cardWidth = (maxWidth * 0.215).clamp(72.0, 100.0);
     double cardHeight = cardWidth * 1.42;
 
     // Katmanlar arası dikey kayma: Üst sıranın üst ~45 pikseli (köşe indeksi + simgeler) tamamen görünür kalır
@@ -204,19 +185,17 @@ class _FannedHandViewState extends State<FannedHandView> {
 
     List<Widget> topLayerWidgets = [];
     List<Widget> bottomLayerWidgets = [];
-    Widget? selectedWidget;
 
     // Üst katman kartlarını konumlandır (Arka sıra)
     for (int i = 0; i < topCount; i++) {
       final card = topCards[i];
-      final isSelected = _selectedCard == card;
 
       double centerOffset = (topCount > 1) ? (i - (topCount - 1) / 2.0) : 0;
       double angle = centerOffset * angleStepTop;
       double curveY = (centerOffset * centerOffset) * 0.16;
 
       double leftPos = startXTop + i * topSpacing;
-      double bottomPos = layerOffsetY + 4.0 - curveY + (isSelected ? 22.0 : 0.0);
+      double bottomPos = layerOffsetY + 4.0 - curveY;
 
       final widgetItem = Positioned(
         key: ValueKey('top_${card.suit.name}_${card.rank.name}'),
@@ -225,28 +204,23 @@ class _FannedHandViewState extends State<FannedHandView> {
         child: Transform.rotate(
           angle: angle,
           alignment: Alignment.bottomCenter,
-          child: _buildCardWidget(card, cardWidth, cardHeight, isSelected),
+          child: _buildCardWidget(context, card, cardWidth, cardHeight),
         ),
       );
 
-      if (isSelected) {
-        selectedWidget = widgetItem;
-      } else {
-        topLayerWidgets.add(widgetItem);
-      }
+      topLayerWidgets.add(widgetItem);
     }
 
     // Alt katman kartlarını konumlandır (Ön sıra)
     for (int i = 0; i < bottomCount; i++) {
       final card = bottomCards[i];
-      final isSelected = _selectedCard == card;
 
       double centerOffset = (bottomCount > 1) ? (i - (bottomCount - 1) / 2.0) : 0;
       double angle = centerOffset * angleStepBottom;
       double curveY = (centerOffset * centerOffset) * 0.18;
 
       double leftPos = startXBottom + i * bottomSpacing;
-      double bottomPos = 4.0 - curveY + (isSelected ? 22.0 : 0.0);
+      double bottomPos = 4.0 - curveY;
 
       final widgetItem = Positioned(
         key: ValueKey('bottom_${card.suit.name}_${card.rank.name}'),
@@ -255,15 +229,11 @@ class _FannedHandViewState extends State<FannedHandView> {
         child: Transform.rotate(
           angle: angle,
           alignment: Alignment.bottomCenter,
-          child: _buildCardWidget(card, cardWidth, cardHeight, isSelected),
+          child: _buildCardWidget(context, card, cardWidth, cardHeight),
         ),
       );
 
-      if (isSelected) {
-        selectedWidget = widgetItem;
-      } else {
-        bottomLayerWidgets.add(widgetItem);
-      }
+      bottomLayerWidgets.add(widgetItem);
     }
 
     return SizedBox(
@@ -277,8 +247,6 @@ class _FannedHandViewState extends State<FannedHandView> {
           ...topLayerWidgets,
           // 2. Alt katman (Ön)
           ...bottomLayerWidgets,
-          // 3. Seçili kart: Hangi sırada olursa olsun en öne çıkar ve parlar
-          if (selectedWidget != null) selectedWidget,
         ],
       ),
     );
@@ -286,21 +254,20 @@ class _FannedHandViewState extends State<FannedHandView> {
 
   /// Ortak Kart Bileşeni ve Dokunma Geri Bildirimi
   Widget _buildCardWidget(
+    BuildContext context,
     PlayingCard card,
     double width,
     double height,
-    bool isSelected,
   ) {
-    final isValid = widget.isCardValid(card);
+    final isValid = isCardValid(card);
 
     return RealisticPlayingCardWidget(
       card: card,
       width: width,
       height: height,
-      isSelected: isSelected,
-      isPlayable: !widget.isMyTurn || isValid,
+      isPlayable: !isMyTurn || isValid,
       onTap: () {
-        if (!widget.isMyTurn) {
+        if (!isMyTurn) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -325,18 +292,7 @@ class _FannedHandViewState extends State<FannedHandView> {
           return;
         }
 
-        // İki Tıklamalı Etkileşim:
-        // İlk tık kartı seçer, kaldırır ve parlatır; ikinci tık masaya atar.
-        if (_selectedCard == card) {
-          setState(() {
-            _selectedCard = null;
-          });
-          widget.onPlayCard(card);
-        } else {
-          setState(() {
-            _selectedCard = card;
-          });
-        }
+        onPlayCard(card);
       },
     );
   }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/card_model.dart';
 import '../models/player_model.dart';
-import '../engine/game_engine.dart';
 import '../providers/game_provider.dart';
 import '../providers/store_provider.dart';
 import '../widgets/realistic_playing_card.dart';
@@ -11,7 +10,6 @@ import '../widgets/fanned_hand_view.dart';
 import '../widgets/game_action_panels.dart';
 import '../widgets/settings_dialog.dart';
 import '../widgets/scoreboard_dialog.dart';
-import '../widgets/card_art/suit_shapes.dart';
 
 class BatakGameScreen extends StatefulWidget {
   const BatakGameScreen({super.key});
@@ -120,6 +118,9 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
 
                   bool isMyTurn = (gameProvider.currentPhase == GamePhase.playing) &&
                       (gameProvider.currentTurnIndex == 0);
+                  final validMoves = isMyTurn
+                      ? gameProvider.getValidMovesForPlayer(myPlayer).toSet()
+                      : const <PlayingCard>{};
 
                   bool showScoreOverlay = gameProvider.currentPhase == GamePhase.roundFinished ||
                       gameProvider.currentPhase == GamePhase.gameOver;
@@ -145,7 +146,7 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                               tooltip: 'Çıkış',
                             ),
 
-                            // Mod & Tur & Koz Göstergesi
+                            // Mod ve tur göstergesi
                             Flexible(
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -198,23 +199,6 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                                             : "Tur: ${gameProvider.currentRound}/${gameProvider.totalRounds}",
                                         style: const TextStyle(
                                           color: Color(0xFFFFD54F),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 5),
-                                        child: Text("|", style: TextStyle(color: Colors.white24, fontSize: 12)),
-                                      ),
-                                      _buildTrumpHudItem(gameProvider, compact: screenSize.width < 360),
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(horizontal: 5),
-                                        child: Text("|", style: TextStyle(color: Colors.white24, fontSize: 12)),
-                                      ),
-                                      Text(
-                                        "${gameProvider.tricksPlayed}/13",
-                                        style: const TextStyle(
-                                          color: Colors.white,
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -351,13 +335,7 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                                       isMyTurn: isMyTurn,
                                       sortAscending: gameProvider.sortAscending,
                                       isCardValid: (card) {
-                                        if (!isMyTurn) return false;
-                                        return GameEngine.isValidPlay(
-                                          cardToPlay: card,
-                                          player: myPlayer,
-                                          tableCards: gameProvider.tableCards,
-                                          trumpSuit: gameProvider.currentTrump,
-                                        );
+                                        return validMoves.contains(card);
                                       },
                                       onPlayCard: (card) {
                                         gameProvider.playCard(myPlayer, card);
@@ -368,13 +346,7 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                                       isMyTurn: isMyTurn,
                                       sortAscending: gameProvider.sortAscending,
                                       isCardValid: (card) {
-                                        if (!isMyTurn) return false;
-                                        return GameEngine.isValidPlay(
-                                          cardToPlay: card,
-                                          player: myPlayer,
-                                          tableCards: gameProvider.tableCards,
-                                          trumpSuit: gameProvider.currentTrump,
-                                        );
+                                        return validMoves.contains(card);
                                       },
                                       onPlayCard: (card) {
                                         gameProvider.playCard(myPlayer, card);
@@ -468,54 +440,6 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
           child: Icon(icon, color: color, size: iconSize),
         ),
       ),
-    );
-  }
-
-  Widget _buildTrumpHudItem(GameProvider gameProvider, {bool compact = false}) {
-    if (gameProvider.currentPhase == GamePhase.bidding) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            compact ? "İh: " : "İhale: ",
-            style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 11, fontWeight: FontWeight.bold),
-          ),
-          Text(
-            gameProvider.currentHighestBid > 0 ? "${gameProvider.currentHighestBid}" : "-",
-            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800),
-          ),
-        ],
-      );
-    }
-
-    if (gameProvider.currentPhase == GamePhase.trumpSelection) {
-      return const Text(
-        "Koz Seçimi",
-        style: TextStyle(color: Color(0xFFD4AF37), fontSize: 11, fontWeight: FontWeight.bold),
-      );
-    }
-
-    final suit = gameProvider.currentTrump;
-    final isRed = suit == Suit.hearts || suit == Suit.diamonds;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          compact ? "K: " : "Koz: ",
-          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(left: 2),
-          child: CustomPaint(
-            size: const Size(12, 12),
-            painter: SuitIconPainter(
-              suit: suit,
-              color: isRed ? const Color(0xFFFF5252) : Colors.white,
-            ),
-          ),
-        ),
-      ],
     );
   }
 

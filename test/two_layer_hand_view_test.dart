@@ -129,7 +129,7 @@ void main() {
       expect(transforms.length, greaterThanOrEqualTo(13));
     });
 
-    testWidgets('4. First tap selects card (lifts up), second tap plays card',
+    testWidgets('4. First tap plays a legal card without selection',
         (WidgetTester tester) async {
       final hand13 = createDeck(13);
       PlayingCard? playedCard;
@@ -154,20 +154,17 @@ void main() {
         ),
       );
 
-      // Tap a card in the foreground (bottom layer) once -> select
+      // A legal card is played on the first tap.
       final bottomCardWidget = find.byType(RealisticPlayingCardWidget).last;
       await tester.tap(bottomCardWidget);
       await tester.pump();
 
-      // Card is selected, not played yet
-      expect(playedCard, isNull);
-
-      // Tap same card again -> play
-      await tester.tap(bottomCardWidget);
-      await tester.pump();
-
-      // Played card callback triggered
       expect(playedCard, isNotNull);
+      expect(
+        tester.widgetList<RealisticPlayingCardWidget>(find.byType(RealisticPlayingCardWidget))
+            .every((card) => !card.isSelected),
+        isTrue,
+      );
     });
 
     testWidgets('5. Invalid play shows snackbar and rejects selection/play',
@@ -231,7 +228,7 @@ void main() {
     });
 
     testWidgets(
-        '7. Tapping exposed top of an upper layer card selects and elevates it',
+        '7. Tapping exposed top of an upper layer card plays it immediately',
         (WidgetTester tester) async {
       final hand13 = createDeck(13);
       PlayingCard? playedCard;
@@ -261,13 +258,6 @@ void main() {
       expect(topCardFinder, findsOneWidget);
 
       // Tap near the top of the upper layer card (exposed rank/suit area)
-      await tester.tapAt(tester.getTopLeft(topCardFinder) + const Offset(15, 15));
-      await tester.pump();
-
-      // Card is selected (not played yet)
-      expect(playedCard, isNull);
-
-      // Tap selected card again -> plays card
       await tester.tapAt(tester.getTopLeft(topCardFinder) + const Offset(15, 15));
       await tester.pump();
 

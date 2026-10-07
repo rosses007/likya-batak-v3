@@ -11,6 +11,17 @@ void main() {
   });
 
   group('LIKYA-V2-002: GameProvider Async Lifecycle & Lock Hardening', () {
+    test('Bot pacing stays responsive across supported speed settings', () {
+      final provider = GameProvider();
+      provider.gameSpeed = 0.8;
+      expect(provider.delayBase, 300);
+      provider.gameSpeed = 1.2;
+      expect(provider.delayBase, 200);
+      provider.gameSpeed = 2.2;
+      expect(provider.delayBase, 120);
+      provider.dispose();
+    });
+
     test('1. Schedule bot turn -> start new game before timer fires -> old action does not execute', () async {
       final provider = GameProvider();
       final initialGen = provider.gameGeneration;
