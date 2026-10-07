@@ -468,7 +468,6 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
         ];
         break;
       case TableColor.green:
-      default:
         gradientColors = [
           const Color(0xFF1B5E3A),
           const Color(0xFF14492B),

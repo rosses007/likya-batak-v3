@@ -24,7 +24,6 @@ class FannedHandView extends StatelessWidget {
   });
 
   @override
-  @override
   Widget build(BuildContext context) {
     if (hand.isEmpty) {
       return const SizedBox(height: 150);

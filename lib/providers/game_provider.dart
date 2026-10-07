@@ -6,7 +6,6 @@ import '../models/deck.dart';
 import '../engine/game_engine.dart';
 import '../engine/ai_engine.dart';
 import '../services/sound_service.dart';
-import '../services/api_service.dart';
 import '../engine/scoring_engine.dart';
 import '../engine/game_mode_rules.dart';
 import '../engine/team_engine.dart';
@@ -785,17 +784,6 @@ class GameProvider extends ChangeNotifier {
         _safeNotifyListeners();
         unawaited(deleteSavedGame());
 
-        // NON-AUTHORITATIVE SIDE EFFECT: Ağ kaydı (LIKYA-V2-003 §15)
-        // Bu çağrı: yerel kazananı belirleme, oyun tamamlamayı engelleme,
-        // ve puan mutasyonu yapmaz. Ağ hatası offline oyunu bozmaz.
-        final int winner = ScoringEngine.determineWinnerIndex(cumulativeScores);
-        try {
-          await ApiService.saveMatchScore(
-            isMultiplayer: false,
-            players: players,
-            winnerIndex: winner,
-          );
-        } catch (_) {}
       }
     } finally {
       _isAdvancingRound = false;
