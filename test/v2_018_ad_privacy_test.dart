@@ -49,6 +49,12 @@ class VipStore extends ChangeNotifier implements StoreProvider {
   @override
   bool vipStatusLoaded = true;
   @override
+  bool isRestoring = false;
+  @override
+  bool isPurchasePending = false;
+  @override
+  String? feedback;
+  @override
   List<ProductDetails> products = [];
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

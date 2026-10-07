@@ -16,11 +16,18 @@ class FakeStore extends ChangeNotifier implements StoreProvider {
   @override
   bool vipStatusLoaded = true;
   @override
+  bool isRestoring = false;
+  @override
+  bool isPurchasePending = false;
+  @override
+  String? feedback;
+  int restoreCalls = 0;
+  @override
   List<ProductDetails> products = [];
   @override
   void buyVip() {}
   @override
-  Future<void> restorePurchases() async {}
+  Future<void> restorePurchases() async { restoreCalls++; }
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -43,6 +50,15 @@ Future<void> _pumpMenu(WidgetTester tester, Size size, {FakeStore? store}) async
 }
 
 void main() {
+  testWidgets('restore action calls StoreProvider', (tester) async {
+    final store = FakeStore();
+    await _pumpMenu(tester, const Size(390, 760), store: store);
+    final button = find.text('Satın Alımları Geri Yükle');
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pump();
+    expect(store.restoreCalls, 1);
+  });
   const widths = [344.0, 390.0, 430.0];
 
   for (final w in widths) {

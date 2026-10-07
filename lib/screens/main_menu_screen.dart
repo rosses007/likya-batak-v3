@@ -502,7 +502,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             side: BorderSide(color: _gold.withOpacity(0.7)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          onPressed: () {
+          onPressed: store.isPurchasePending ? null : () {
             if (store.products.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text("Mağaza şu anda kullanılamıyor. Lütfen daha sonra tekrar dene.")),
@@ -640,6 +640,20 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
                     const SizedBox(height: 16),
                     _vipButton(),
+                    Consumer<StoreProvider>(builder: (context, store, _) => Column(
+                      children: [
+                        TextButton.icon(
+                          onPressed: store.isRestoring ? null : () => store.restorePurchases(),
+                          icon: store.isRestoring
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.restore),
+                          label: const Text('Satın Alımları Geri Yükle'),
+                        ),
+                        if (store.isPurchasePending) const Text('Satın alma beklemede', style: TextStyle(color: Colors.white70)),
+                        if (store.feedback != null)
+                          Text(store.feedback!, style: const TextStyle(color: Colors.white70)),
+                      ],
+                    )),
                     const Spacer(),
                     const SizedBox(height: 14),
                     Row(

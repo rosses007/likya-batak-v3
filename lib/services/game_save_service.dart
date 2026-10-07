@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/saved_game_model.dart';
+import '../providers/game_provider.dart';
 import '../engine/game_mode_rules.dart';
 
 /// Yetkili kayıt ve devam servisi (LIKYA-V2-006).
@@ -15,6 +16,10 @@ class GameSaveService {
   /// Yarım kalmış aktif oyunu SharedPreferences'a kaydeder.
   /// Hata durumunda oyunu kitlemez, false döner.
   static Future<bool> saveGame(SavedGameModel model) async {
+    if (model.currentPhase == GamePhase.gameOver) {
+      await deleteSave();
+      return false;
+    }
     // Desteklenmeyen modları (Gömmeli / Online) kaydetme
     if (model.gameMode == BatakGameMode.gommeli) {
       return false;
@@ -51,7 +56,8 @@ class GameSaveService {
       }
 
       // Desteklenmeyen mod kontrolü
-      if (model.gameMode == BatakGameMode.gommeli) {
+      if (model.gameMode == BatakGameMode.gommeli ||
+          model.currentPhase == GamePhase.gameOver) {
         await prefs.remove(saveKey);
         return null;
       }
@@ -76,7 +82,8 @@ class GameSaveService {
   static Future<bool> hasSavedGame() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.containsKey(saveKey) && (prefs.getString(saveKey)?.isNotEmpty ?? false);
+      return prefs.containsKey(saveKey) &&
+          (prefs.getString(saveKey)?.isNotEmpty ?? false);
     } catch (_) {
       return false;
     }

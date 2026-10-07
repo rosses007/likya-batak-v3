@@ -433,7 +433,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
               const SizedBox(height: 10),
               const Center(
                 child: Text(
-                  "Likya Batak • v1.0.9 (Build 10) • Kapalı Beta",
+                  "Likya Batak • v1.2.0 (Build 3) • Kapalı Beta",
                   style: TextStyle(color: Colors.white54, fontSize: 11, letterSpacing: 0.8),
                 ),
               ),
