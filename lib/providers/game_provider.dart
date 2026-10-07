@@ -22,24 +22,24 @@ export '../models/saved_game_model.dart';
 export '../services/game_save_service.dart';
 
 enum GamePhase {
-  bidding,         // İhale Aşaması
-  trumpSelection,  // Koz Seçimi
-  playing,         // Kart Atma Aşaması
-  trickFinished,   // El bitti (4 kart atıldı)
-  roundFinished,   // Tur bitti (13 el bitti, puanlar hesaplandı)
-  gameOver         // Tüm maç bitti (Örn: 5 turun 5'i de tamamlandı)
+  bidding, // İhale Aşaması
+  trumpSelection, // Koz Seçimi
+  playing, // Kart Atma Aşaması
+  trickFinished, // El bitti (4 kart atıldı)
+  roundFinished, // Tur bitti (13 el bitti, puanlar hesaplandı)
+  gameOver // Tüm maç bitti (Örn: 5 turun 5'i de tamamlandı)
 }
 
 enum HandLayoutMode {
-  fanned,   // Çapraz / Yelpaze
-  twoRow    // İki Sıra
+  fanned, // Çapraz / Yelpaze
+  twoRow // İki Sıra
 }
 
 enum TableColor {
-  green,    // Zümrüt Yeşil Çuha
-  blue,     // Kraliyet Mavisi
-  red,      // Bordo Çuha
-  dark      // Kömür Siyahı
+  green, // Zümrüt Yeşil Çuha
+  blue, // Kraliyet Mavisi
+  red, // Bordo Çuha
+  dark // Kömür Siyahı
 }
 
 class GameProvider extends ChangeNotifier {
@@ -61,6 +61,40 @@ class GameProvider extends ChangeNotifier {
   int currentTurnIndex = 0;
   int bidderIndex = 0;
   int tricksPlayed = 0; // 0..13
+
+  /// Controller is derived from the bidder and fixed team pairing; no save field.
+  int? get partnerDeclarerIndex => gameMode == BatakGameMode.partner &&
+          players.length == 4 &&
+          bidderIndex >= 0 &&
+          bidderIndex < 4 &&
+          currentPhase != GamePhase.bidding &&
+          currentPhase != GamePhase.trumpSelection
+      ? bidderIndex
+      : null;
+
+  int? get partnerDummyIndex => partnerDeclarerIndex == null
+      ? null
+      : TeamEngine.partnerIndexFor(partnerDeclarerIndex!);
+
+  bool isDummyPlayer(int index) => partnerDummyIndex == index;
+
+  bool isHumanControllerForPlayer(int index) {
+    if (index < 0 || index >= players.length) return false;
+    final declarer = partnerDeclarerIndex;
+    if (declarer != null && (index == declarer || isDummyPlayer(index))) {
+      return !players[declarer].isAI;
+    }
+    return !players[index].isAI;
+  }
+
+  bool shouldAIControlPlayer(int index) {
+    if (index < 0 || index >= players.length) return false;
+    final declarer = partnerDeclarerIndex;
+    if (declarer != null && (index == declarer || isDummyPlayer(index))) {
+      return players[declarer].isAI;
+    }
+    return players[index].isAI;
+  }
 
   // Tur & Maç Yönetimi (1 elden 7 ele kadar)
   int totalRounds = 5;
@@ -224,7 +258,8 @@ class GameProvider extends ChangeNotifier {
       // İlk eli dağıtanın solundaki oyuncu başlatır
       currentTurnIndex = (currentRound - 1) % 4;
       currentPhase = GamePhase.playing;
-      statusMessage = "Tur $currentRound / $totalRounds - Koz Maça başladı! (Koz: ${_suitName(currentTrump)})";
+      statusMessage =
+          "Tur $currentRound / $totalRounds - Koz Maça başladı! (Koz: ${_suitName(currentTrump)})";
 
       SoundService.playCardDeal();
       _safeNotifyListeners();
@@ -307,12 +342,14 @@ class GameProvider extends ChangeNotifier {
 
   GameActionResult userPlaceBid(int bid) {
     if (_isHumanActionLocked) {
-      return const GameActionResult.failure("İşlem devam ediyor, lütfen bekleyin.");
+      return const GameActionResult.failure(
+          "İşlem devam ediyor, lütfen bekleyin.");
     }
     _isHumanActionLocked = true;
     try {
       if (!GameModeRules.forMode(gameMode).hasBidding) {
-        return const GameActionResult.failure("Bu oyun modunda ihale aşaması yoktur.");
+        return const GameActionResult.failure(
+            "Bu oyun modunda ihale aşaması yoktur.");
       }
       if (currentPhase != GamePhase.bidding) {
         return const GameActionResult.failure("İhale aşamasında değilsiniz.");
@@ -324,10 +361,12 @@ class GameProvider extends ChangeNotifier {
         return const GameActionResult.failure("Zaten pas dediniz.");
       }
       if (bid <= currentHighestBid) {
-        return const GameActionResult.failure("Teklif mevcut en yüksek tekliften büyük olmalıdır.");
+        return const GameActionResult.failure(
+            "Teklif mevcut en yüksek tekliften büyük olmalıdır.");
       }
       if (bid > 13) {
-        return const GameActionResult.failure("Batakta maksimum 13 teklif edilebilir.");
+        return const GameActionResult.failure(
+            "Batakta maksimum 13 teklif edilebilir.");
       }
 
       currentHighestBid = bid;
@@ -343,12 +382,14 @@ class GameProvider extends ChangeNotifier {
 
   GameActionResult userPassBid() {
     if (_isHumanActionLocked) {
-      return const GameActionResult.failure("İşlem devam ediyor, lütfen bekleyin.");
+      return const GameActionResult.failure(
+          "İşlem devam ediyor, lütfen bekleyin.");
     }
     _isHumanActionLocked = true;
     try {
       if (!GameModeRules.forMode(gameMode).hasBidding) {
-        return const GameActionResult.failure("Bu oyun modunda ihale aşaması yoktur.");
+        return const GameActionResult.failure(
+            "Bu oyun modunda ihale aşaması yoktur.");
       }
       if (currentPhase != GamePhase.bidding) {
         return const GameActionResult.failure("İhale aşamasında değilsiniz.");
@@ -468,7 +509,8 @@ class GameProvider extends ChangeNotifier {
         biddingTeam: bidTeam,
         trump: currentTrump,
       );
-      statusMessage = "${winningBot.name} $currentHighestBid ile ihaleyi aldı. Koz: ${_suitName(currentTrump)}";
+      statusMessage =
+          "${winningBot.name} $currentHighestBid ile ihaleyi aldı. Koz: ${_suitName(currentTrump)}";
       _safeNotifyListeners();
       unawaited(autoSaveCurrentGame());
       _scheduleBotTurn();
@@ -477,18 +519,22 @@ class GameProvider extends ChangeNotifier {
 
   GameActionResult userSelectTrump(Suit suit) {
     if (_isHumanActionLocked) {
-      return const GameActionResult.failure("İşlem devam ediyor, lütfen bekleyin.");
+      return const GameActionResult.failure(
+          "İşlem devam ediyor, lütfen bekleyin.");
     }
     _isHumanActionLocked = true;
     try {
       if (GameModeRules.forMode(gameMode).isFixedTrump) {
-        return const GameActionResult.failure("Bu oyun modunda koz sabittir ve değiştirilemez.");
+        return const GameActionResult.failure(
+            "Bu oyun modunda koz sabittir ve değiştirilemez.");
       }
       if (currentPhase != GamePhase.trumpSelection) {
-        return const GameActionResult.failure("Koz seçim aşamasında değilsiniz.");
+        return const GameActionResult.failure(
+            "Koz seçim aşamasında değilsiniz.");
       }
       if (bidderIndex != 0) {
-        return const GameActionResult.failure("Kozu yalnızca ihaleyi kazanan oyuncu seçebilir.");
+        return const GameActionResult.failure(
+            "Kozu yalnızca ihaleyi kazanan oyuncu seçebilir.");
       }
 
       currentTrump = suit;
@@ -506,10 +552,14 @@ class GameProvider extends ChangeNotifier {
 
   String _suitName(Suit s) {
     switch (s) {
-      case Suit.spades: return "Maça ♠";
-      case Suit.hearts: return "Kupa ♥";
-      case Suit.diamonds: return "Karo ♦";
-      case Suit.clubs: return "Sinek ♣";
+      case Suit.spades:
+        return "Maça ♠";
+      case Suit.hearts:
+        return "Kupa ♥";
+      case Suit.diamonds:
+        return "Karo ♦";
+      case Suit.clubs:
+        return "Sinek ♣";
     }
   }
 
@@ -517,7 +567,9 @@ class GameProvider extends ChangeNotifier {
 
   /// Oyuncunun kurallara uygun olarak oynayabileceği geçerli kartları döner.
   List<PlayingCard> getValidMovesForPlayer(Player player) {
-    if (currentPhase != GamePhase.playing || players.isEmpty || players[currentTurnIndex] != player) {
+    if (currentPhase != GamePhase.playing ||
+        players.isEmpty ||
+        players[currentTurnIndex] != player) {
       return const [];
     }
     return GameEngine.getValidMoves(
@@ -528,27 +580,36 @@ class GameProvider extends ChangeNotifier {
   }
 
   Future<GameActionResult> playCard(Player player, PlayingCard card) async {
-    if (!player.isAI) {
+    final index = players.indexOf(player);
+    // Public taps cannot act for a seat directed by an AI declarer.
+    if (gameMode == BatakGameMode.partner &&
+        index == currentTurnIndex &&
+        shouldAIControlPlayer(index)) {
+      return const GameActionResult.failure("Bu eli yapay zekâ yönetiyor.");
+    }
+    final humanAction = index >= 0 && isHumanControllerForPlayer(index);
+    if (humanAction) {
       if (_isHumanActionLocked) {
-        return const GameActionResult.failure("İşlem devam ediyor, lütfen bekleyin.");
+        return const GameActionResult.failure(
+            "İşlem devam ediyor, lütfen bekleyin.");
       }
       _isHumanActionLocked = true;
     }
     try {
       return await _playCardInternal(player, card, _gameGeneration);
     } finally {
-      if (!player.isAI) {
-        _isHumanActionLocked = false;
-      }
+      if (humanAction) _isHumanActionLocked = false;
     }
   }
 
-  Future<GameActionResult> _playCardInternal(Player player, PlayingCard card, int generation) async {
+  Future<GameActionResult> _playCardInternal(
+      Player player, PlayingCard card, int generation) async {
     if (_isDisposed || generation != _gameGeneration) {
       return const GameActionResult.failure("Oyun oturumu geçerli değil.");
     }
     if (_isResolvingTrick) {
-      return const GameActionResult.failure("Önceki el toplanıyor, lütfen bekleyin.");
+      return const GameActionResult.failure(
+          "Önceki el toplanıyor, lütfen bekleyin.");
     }
 
     // 1. Durum / Yetki / Kural Kontrolleri (Mutation öncesi mutlak doğrulama)
@@ -588,7 +649,8 @@ class GameProvider extends ChangeNotifier {
       card: card,
       trickNumber: trickNumber,
     );
-    if (!playedHistory.any((r) => r.card == card && r.trickNumber == trickNumber)) {
+    if (!playedHistory
+        .any((r) => r.card == card && r.trickNumber == trickNumber)) {
       playedHistory.add(record);
     }
     botMemory.recordPlay(
@@ -607,7 +669,8 @@ class GameProvider extends ChangeNotifier {
       _safeNotifyListeners();
 
       _trickResolutionTimer?.cancel();
-      _trickResolutionTimer = Timer(Duration(milliseconds: (delayBase * 1.5).round()), () async {
+      _trickResolutionTimer =
+          Timer(Duration(milliseconds: (delayBase * 1.5).round()), () async {
         if (_isDisposed || generation != _gameGeneration) return;
         try {
           int actualWinnerIdx = GameEngine.determineTrickWinnerPlayerIndex(
@@ -622,7 +685,8 @@ class GameProvider extends ChangeNotifier {
 
           if (_isDisposed || generation != _gameGeneration) return;
 
-          botMemory.recordTrickWinner(actualWinnerIdx, trickNumber: tricksPlayed);
+          botMemory.recordTrickWinner(actualWinnerIdx,
+              trickNumber: tricksPlayed);
 
           statusMessage = "Eli ${players[actualWinnerIdx].name} aldı!";
           tableCards.clear();
@@ -657,7 +721,7 @@ class GameProvider extends ChangeNotifier {
   void _scheduleBotTurn() {
     if (_isDisposed || currentPhase != GamePhase.playing) return;
     if (players.isEmpty || currentTurnIndex >= players.length) return;
-    if (!players[currentTurnIndex].isAI) return;
+    if (!shouldAIControlPlayer(currentTurnIndex)) return;
     if (_isResolvingTrick) return;
 
     _botTurnTimer?.cancel();
@@ -679,7 +743,7 @@ class GameProvider extends ChangeNotifier {
       if (players.isEmpty || currentTurnIndex >= players.length) return;
 
       final Player currentBot = players[currentTurnIndex];
-      if (!currentBot.isAI) return;
+      if (!shouldAIControlPlayer(currentTurnIndex)) return;
       if (currentBot.hand.isEmpty) return;
 
       // STEP 7: Select card AFTER delay and revalidation
@@ -691,8 +755,10 @@ class GameProvider extends ChangeNotifier {
         bot: currentBot,
         tableCards: tableCards,
         trumpSuit: currentTrump,
-        botPlayerIndex: gameMode == BatakGameMode.partner ? currentTurnIndex : null,
-        playedCardsByPlayer: gameMode == BatakGameMode.partner ? playedCardsByPlayer : null,
+        botPlayerIndex:
+            gameMode == BatakGameMode.partner ? currentTurnIndex : null,
+        playedCardsByPlayer:
+            gameMode == BatakGameMode.partner ? playedCardsByPlayer : null,
         leadPlayerIndex: gameMode == BatakGameMode.partner ? leadIdx : null,
         memory: botMemory,
         difficulty: aiDifficulty,
@@ -783,7 +849,6 @@ class GameProvider extends ChangeNotifier {
         statusMessage = "Tüm turlar tamamlandı! Şampiyon belli oldu.";
         _safeNotifyListeners();
         unawaited(deleteSavedGame());
-
       }
     } finally {
       _isAdvancingRound = false;
@@ -820,14 +885,16 @@ class GameProvider extends ChangeNotifier {
       passedPlayers: List.of(passedPlayers),
       currentTrump: currentTrump,
       tricksPlayed: tricksPlayed,
-      players: players.map((p) => Player(
-        id: p.id,
-        name: p.name,
-        isAI: p.isAI,
-        hand: List.of(p.hand),
-        bid: p.bid,
-        tricksWon: p.tricksWon,
-      )).toList(),
+      players: players
+          .map((p) => Player(
+                id: p.id,
+                name: p.name,
+                isAI: p.isAI,
+                hand: List.of(p.hand),
+                bid: p.bid,
+                tricksWon: p.tricksWon,
+              ))
+          .toList(),
       tableCards: List.of(tableCards),
       playedCardsByPlayer: Map.of(playedCardsByPlayer),
       playedHistory: List.unmodifiable(playedHistory),
@@ -860,27 +927,31 @@ class GameProvider extends ChangeNotifier {
     passedPlayers = Set<int>.from(model.passedPlayers);
     currentTrump = model.currentTrump;
     tricksPlayed = model.tricksPlayed;
-    players = model.players.map((p) => Player(
-      id: p.id,
-      name: p.name,
-      isAI: p.isAI,
-      hand: List.of(p.hand),
-      bid: p.bid,
-      tricksWon: p.tricksWon,
-    )).toList();
+    players = model.players
+        .map((p) => Player(
+              id: p.id,
+              name: p.name,
+              isAI: p.isAI,
+              hand: List.of(p.hand),
+              bid: p.bid,
+              tricksWon: p.tricksWon,
+            ))
+        .toList();
     tableCards = List.of(model.tableCards);
     playedCardsByPlayer = Map.of(model.playedCardsByPlayer);
     playedHistory = List.of(model.playedHistory);
     cumulativeScores = List.of(model.cumulativeScores);
-    roundScoresHistory = model.roundScoresHistory.map((h) => List.of(h)).toList();
+    roundScoresHistory =
+        model.roundScoresHistory.map((h) => List.of(h)).toList();
     roundResults = List.of(model.roundResults);
     _roundScored = model.roundScored;
     statusMessage = model.statusMessage;
 
     final restoredBidder = model.bidderIndex >= 0 ? model.bidderIndex : null;
-    final TeamId? restoredBiddingTeam = (model.gameMode == BatakGameMode.partner && restoredBidder != null)
-        ? TeamEngine.teamForPlayer(restoredBidder)
-        : null;
+    final TeamId? restoredBiddingTeam =
+        (model.gameMode == BatakGameMode.partner && restoredBidder != null)
+            ? TeamEngine.teamForPlayer(restoredBidder)
+            : null;
 
     final Map<int, int> restoredTricksWon = {};
     for (int i = 0; i < players.length; i++) {
@@ -893,7 +964,10 @@ class GameProvider extends ChangeNotifier {
       playedHistory,
       trump: model.currentTrump,
       bidderIdx: restoredBidder,
-      winBid: (model.gameMode != BatakGameMode.kozMaca && restoredBidder != null) ? model.currentHighestBid : null,
+      winBid:
+          (model.gameMode != BatakGameMode.kozMaca && restoredBidder != null)
+              ? model.currentHighestBid
+              : null,
       bidTeam: restoredBiddingTeam,
       tricksWon: restoredTricksWon,
     );
@@ -902,11 +976,16 @@ class GameProvider extends ChangeNotifier {
 
     // Restorasyon sonrası bot sırası ise bot eylemini yeniden planla
     if (currentPhase == GamePhase.bidding) {
-      if (players.isNotEmpty && biddingTurnIndex < players.length && players[biddingTurnIndex].isAI) {
+      if (players.isNotEmpty &&
+          biddingTurnIndex < players.length &&
+          players[biddingTurnIndex].isAI) {
         _scheduleBotBid();
       }
     } else if (currentPhase == GamePhase.playing) {
-      if (players.isNotEmpty && currentTurnIndex < players.length && players[currentTurnIndex].isAI && !_isResolvingTrick) {
+      if (players.isNotEmpty &&
+          currentTurnIndex < players.length &&
+          shouldAIControlPlayer(currentTurnIndex) &&
+          !_isResolvingTrick) {
         _scheduleBotTurn();
       }
     }

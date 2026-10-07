@@ -7,6 +7,7 @@ import '../providers/store_provider.dart';
 import '../widgets/realistic_playing_card.dart';
 import '../widgets/two_row_hand_view.dart';
 import '../widgets/fanned_hand_view.dart';
+import '../widgets/exposed_dummy_hand.dart';
 import '../widgets/game_action_panels.dart';
 import '../widgets/settings_dialog.dart';
 import '../widgets/scoreboard_dialog.dart';
@@ -18,7 +19,8 @@ class BatakGameScreen extends StatefulWidget {
   State<BatakGameScreen> createState() => _BatakGameScreenState();
 }
 
-class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingObserver {
+class _BatakGameScreenState extends State<BatakGameScreen>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -116,14 +118,31 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                   Player topPlayer = gameProvider.players[2];
                   Player rightPlayer = gameProvider.players[3];
 
-                  bool isMyTurn = (gameProvider.currentPhase == GamePhase.playing) &&
-                      (gameProvider.currentTurnIndex == 0);
+                  bool isMyTurn =
+                      (gameProvider.currentPhase == GamePhase.playing) &&
+                          (gameProvider.currentTurnIndex == 0);
+                  isMyTurn =
+                      isMyTurn && gameProvider.isHumanControllerForPlayer(0);
                   final validMoves = isMyTurn
                       ? gameProvider.getValidMovesForPlayer(myPlayer).toSet()
                       : const <PlayingCard>{};
+                  final dummyIndex = gameProvider.partnerDummyIndex;
+                  final dummyPlayer = dummyIndex == null
+                      ? null
+                      : gameProvider.players[dummyIndex];
+                  final canPlayDummy = dummyIndex != null &&
+                      gameProvider.currentPhase == GamePhase.playing &&
+                      gameProvider.currentTurnIndex == dummyIndex &&
+                      gameProvider.isHumanControllerForPlayer(dummyIndex);
+                  final dummyValidMoves = canPlayDummy
+                      ? gameProvider
+                          .getValidMovesForPlayer(dummyPlayer!)
+                          .toSet()
+                      : const <PlayingCard>{};
 
-                  bool showScoreOverlay = gameProvider.currentPhase == GamePhase.roundFinished ||
-                      gameProvider.currentPhase == GamePhase.gameOver;
+                  bool showScoreOverlay =
+                      gameProvider.currentPhase == GamePhase.roundFinished ||
+                          gameProvider.currentPhase == GamePhase.gameOver;
 
                   return Stack(
                     children: [
@@ -149,15 +168,21 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                             // Mod ve tur göstergesi
                             Flexible(
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
-                                    colors: [Color(0xFF2C2218), Color(0xFF1A140E)],
+                                    colors: [
+                                      Color(0xFF2C2218),
+                                      Color(0xFF1A140E)
+                                    ],
                                     begin: Alignment.topCenter,
                                     end: Alignment.bottomCenter,
                                   ),
                                   borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: const Color(0xFFC9A04A), width: 1.2),
+                                  border: Border.all(
+                                      color: const Color(0xFFC9A04A),
+                                      width: 1.2),
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black.withOpacity(0.5),
@@ -174,17 +199,23 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                                     children: [
                                       // Oyun Modu Etiketi
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 7, vertical: 2.5),
                                         decoration: BoxDecoration(
-                                          color: gameProvider.gameMode == BatakGameMode.partner
+                                          color: gameProvider.gameMode ==
+                                                  BatakGameMode.partner
                                               ? const Color(0xFF1565C0)
-                                              : (gameProvider.gameMode == BatakGameMode.kozMaca
+                                              : (gameProvider.gameMode ==
+                                                      BatakGameMode.kozMaca
                                                   ? const Color(0xFF5E35B1)
                                                   : const Color(0xFF2E7D32)),
-                                          borderRadius: BorderRadius.circular(5),
+                                          borderRadius:
+                                              BorderRadius.circular(5),
                                         ),
                                         child: Text(
-                                          GameModeRules.forMode(gameProvider.gameMode).shortBadge,
+                                          GameModeRules.forMode(
+                                                  gameProvider.gameMode)
+                                              .shortBadge,
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 10.5,
@@ -217,7 +248,8 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                                   icon: Icons.edit_note,
                                   iconSize: 22,
                                   color: const Color(0xFFC9A04A),
-                                  onPressed: () => _showScoreboard(context, gameProvider),
+                                  onPressed: () =>
+                                      _showScoreboard(context, gameProvider),
                                   tooltip: 'Yazboz',
                                 ),
                                 const SizedBox(width: 4),
@@ -225,7 +257,8 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                                   icon: Icons.settings,
                                   iconSize: 18,
                                   color: const Color(0xFFC9A04A),
-                                  onPressed: () => _openSettings(context, gameProvider),
+                                  onPressed: () =>
+                                      _openSettings(context, gameProvider),
                                   tooltip: 'Ayarlar',
                                 ),
                               ],
@@ -243,7 +276,10 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                             player: topPlayer,
                             playerIndex: 2,
                             gameProvider: gameProvider,
-                            subtitle: gameProvider.gameMode == BatakGameMode.partner ? "EŞİNİZ (BİZ)" : null,
+                            subtitle:
+                                gameProvider.gameMode == BatakGameMode.partner
+                                    ? "EŞİNİZ (BİZ)"
+                                    : null,
                           ),
                         ),
                       ),
@@ -258,7 +294,10 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                             playerIndex: 1,
                             gameProvider: gameProvider,
                             isVertical: true,
-                            subtitle: gameProvider.gameMode == BatakGameMode.partner ? "RAKİP" : null,
+                            subtitle:
+                                gameProvider.gameMode == BatakGameMode.partner
+                                    ? "RAKİP"
+                                    : null,
                           ),
                         ),
                       ),
@@ -273,14 +312,49 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                             playerIndex: 3,
                             gameProvider: gameProvider,
                             isVertical: true,
-                            subtitle: gameProvider.gameMode == BatakGameMode.partner ? "RAKİP" : null,
+                            subtitle:
+                                gameProvider.gameMode == BatakGameMode.partner
+                                    ? "RAKİP"
+                                    : null,
                           ),
                         ),
                       ),
 
+                      if (dummyPlayer != null && dummyIndex == 2)
+                        Positioned(
+                          top: 92,
+                          left: 18,
+                          right: 18,
+                          child: ExposedDummyHand(
+                            hand: dummyPlayer.hand,
+                            isActive: canPlayDummy,
+                            sideSeat: false,
+                            validMoves: dummyValidMoves,
+                            onPlayCard: (card) =>
+                                gameProvider.playCard(dummyPlayer, card),
+                          ),
+                        ),
+                      if (dummyPlayer != null &&
+                          (dummyIndex == 1 || dummyIndex == 3))
+                        Positioned(
+                          top: screenSize.height * 0.28,
+                          left: dummyIndex == 1 ? 4 : null,
+                          right: dummyIndex == 3 ? 4 : null,
+                          width: 142,
+                          child: ExposedDummyHand(
+                            hand: dummyPlayer.hand,
+                            isActive: canPlayDummy,
+                            sideSeat: true,
+                            validMoves: dummyValidMoves,
+                            onPlayCard: (card) =>
+                                gameProvider.playCard(dummyPlayer, card),
+                          ),
+                        ),
+
                       // 4. MASANIN ORTASI (İhale, Koz veya Atılan Dev Kartlar)
                       Center(
-                        child: _buildCenterArea(context, gameProvider, screenSize),
+                        child:
+                            _buildCenterArea(context, gameProvider, screenSize),
                       ),
 
                       // 5. KULLANICI ALANI (Durum Mesajı + Siz Paneli + Dev Kartlar)
@@ -293,11 +367,16 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 6.0),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 5),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF1E1710).withOpacity(0.92),
+                                    color: const Color(0xFF1E1710)
+                                        .withOpacity(0.92),
                                     borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: const Color(0xFFC9A04A).withOpacity(0.6), width: 1),
+                                    border: Border.all(
+                                        color: const Color(0xFFC9A04A)
+                                            .withOpacity(0.6),
+                                        width: 1),
                                     boxShadow: [
                                       BoxShadow(
                                         color: Colors.black.withOpacity(0.4),
@@ -322,14 +401,27 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                               playerIndex: 0,
                               gameProvider: gameProvider,
                               isMe: true,
-                              subtitle: gameProvider.gameMode == BatakGameMode.partner ? "BİZ" : null,
+                              subtitle:
+                                  gameProvider.gameMode == BatakGameMode.partner
+                                      ? "BİZ"
+                                      : null,
                             ),
                             const SizedBox(height: 2),
+                            if (dummyIndex == 0)
+                              const Text('AÇIK EL',
+                                  style: TextStyle(
+                                    color: Color(0xFFFFD54F),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.2,
+                                  )),
 
                             // KART DÜZENİ (Dev ve Gerçekçi Kartlar - Çapraz veya İki Sıra)
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                              child: gameProvider.handLayoutMode == HandLayoutMode.fanned
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8.0),
+                              child: gameProvider.handLayoutMode ==
+                                      HandLayoutMode.fanned
                                   ? FannedHandView(
                                       hand: myPlayer.hand,
                                       isMyTurn: isMyTurn,
@@ -427,7 +519,8 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
           decoration: BoxDecoration(
             color: const Color(0xFF1E1610).withOpacity(0.85),
             shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFF8B7355).withOpacity(0.5), width: 1),
+            border: Border.all(
+                color: const Color(0xFF8B7355).withOpacity(0.5), width: 1),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.4),
@@ -487,7 +580,8 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
     );
   }
 
-  Widget _buildCenterArea(BuildContext context, GameProvider gameProvider, Size screenSize) {
+  Widget _buildCenterArea(
+      BuildContext context, GameProvider gameProvider, Size screenSize) {
     if (gameProvider.currentPhase == GamePhase.bidding) {
       if (gameProvider.biddingTurnIndex == 0) {
         return BiddingKeypadWidget(
@@ -516,7 +610,8 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
               const SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(color: Color(0xFFC9A04A), strokeWidth: 2.2),
+                child: CircularProgressIndicator(
+                    color: Color(0xFFC9A04A), strokeWidth: 2.2),
               ),
               const SizedBox(height: 10),
               Text(
@@ -636,7 +731,8 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
         gameProvider.currentPhase != GamePhase.bidding;
 
     final isTeamPartner = subtitle != null && subtitle.contains("BİZ");
-    final subtitleColor = isTeamPartner ? const Color(0xFF81D4FA) : const Color(0xFFFFAB91);
+    final subtitleColor =
+        isTeamPartner ? const Color(0xFF81D4FA) : const Color(0xFFFFAB91);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -655,7 +751,9 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
         ),
         boxShadow: [
           BoxShadow(
-            color: isTurn ? const Color(0xFFC9A04A).withOpacity(0.3) : Colors.black45,
+            color: isTurn
+                ? const Color(0xFFC9A04A).withOpacity(0.3)
+                : Colors.black45,
             blurRadius: isTurn ? 8 : 4,
             offset: const Offset(0, 2),
           ),
@@ -674,7 +772,8 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
                 shape: BoxShape.circle,
                 color: Color(0xFFC9A04A),
                 boxShadow: [
-                  BoxShadow(color: Color(0xFFFFD54F), blurRadius: 4, spreadRadius: 1),
+                  BoxShadow(
+                      color: Color(0xFFFFD54F), blurRadius: 4, spreadRadius: 1),
                 ],
               ),
             ),
@@ -741,7 +840,9 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
               color: Colors.black.withOpacity(0.55),
               borderRadius: BorderRadius.circular(5),
               border: Border.all(
-                color: isTurn ? const Color(0xFFC9A04A).withOpacity(0.5) : Colors.white10,
+                color: isTurn
+                    ? const Color(0xFFC9A04A).withOpacity(0.5)
+                    : Colors.white10,
                 width: 0.8,
               ),
             ),
@@ -759,4 +860,3 @@ class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingOb
     );
   }
 }
-
