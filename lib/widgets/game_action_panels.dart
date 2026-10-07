@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/card_model.dart';
+import 'card_art/suit_shapes.dart';
 
-/// 3x3 Ahşap İhale Seçim Paneli (5'ten 13'e ve Pas butonu)
+/// LIKYA-V2-013 | Zarif İhale Seçim Paneli (5'ten 13'e ve Pas butonu)
 class BiddingKeypadWidget extends StatelessWidget {
   final int currentHighestBid;
   final Function(int bid) onBidSelected;
@@ -14,60 +15,98 @@ class BiddingKeypadWidget extends StatelessWidget {
     required this.onPass,
   });
 
+  static const Color _gold = Color(0xFFC9A04A);
+  static const Color _ivory = Color(0xFFF6F1E4);
+  static const Color _ink = Color(0xFF1E1D1F);
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      constraints: const BoxConstraints(maxWidth: 240),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.4),
+        color: const Color(0xFF16251C).withOpacity(0.95),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.amber.withOpacity(0.6), width: 1.5),
+        border: Border.all(color: _gold, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.6),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            "İHALE SEÇİMİ",
-            style: TextStyle(
-              color: Colors.amber,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(width: 20, height: 1, color: _gold.withOpacity(0.5)),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  "İHALE VER",
+                  style: TextStyle(
+                    color: _gold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+              Container(width: 20, height: 1, color: _gold.withOpacity(0.5)),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           // 3x3 Grid
-          SizedBox(
-            width: 220,
-            child: GridView.count(
-              crossAxisCount: 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 1.3,
-              children: List.generate(9, (index) {
-                int bidValue = 5 + index; // 5'ten 13'e
-                bool isEnabled = bidValue > currentHighestBid;
+          GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.25,
+            children: List.generate(9, (index) {
+              int bidValue = 5 + index; // 5'ten 13'e
+              bool isEnabled = bidValue > currentHighestBid;
 
-                return _buildWoodButton(
-                  text: "$bidValue",
-                  isEnabled: isEnabled,
-                  onTap: () => onBidSelected(bidValue),
-                );
-              }),
-            ),
+              return _buildBidButton(
+                text: "$bidValue",
+                isEnabled: isEnabled,
+                onTap: () => onBidSelected(bidValue),
+              );
+            }),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           // Pas Butonu
           SizedBox(
-            width: 220,
-            height: 42,
-            child: _buildWoodButton(
-              text: "Pas",
-              isEnabled: true,
-              onTap: onPass,
-              isWide: true,
+            width: double.infinity,
+            height: 40,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onPass,
+                borderRadius: BorderRadius.circular(8),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3E1F18),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF8B4715), width: 1.2),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      "PAS",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -75,11 +114,10 @@ class BiddingKeypadWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildWoodButton({
+  Widget _buildBidButton({
     required String text,
     required bool isEnabled,
     required VoidCallback onTap,
-    bool isWide = false,
   }) {
     return Material(
       color: Colors.transparent,
@@ -88,35 +126,29 @@ class BiddingKeypadWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: Ink(
           decoration: BoxDecoration(
+            color: isEnabled ? _ivory : Colors.black.withOpacity(0.35),
             borderRadius: BorderRadius.circular(8),
-            gradient: LinearGradient(
-              colors: isEnabled
-                  ? [const Color(0xFF9E5429), const Color(0xFF632E11)]
-                  : [const Color(0xFF555555), const Color(0xFF333333)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
             border: Border.all(
-              color: isEnabled ? const Color(0xFFD4A373) : Colors.black45,
-              width: 1.2,
+              color: isEnabled ? _gold : Colors.white12,
+              width: isEnabled ? 1.2 : 0.8,
             ),
             boxShadow: isEnabled
                 ? [
-                    const BoxShadow(
-                      color: Colors.black45,
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.35),
                       blurRadius: 4,
-                      offset: Offset(1, 2),
+                      offset: const Offset(0, 2),
                     ),
                   ]
-                : [],
+                : null,
           ),
           child: Center(
             child: Text(
               text,
               style: TextStyle(
-                color: isEnabled ? Colors.white : Colors.white38,
-                fontSize: isWide ? 18 : 20,
-                fontWeight: FontWeight.bold,
+                color: isEnabled ? _ink : Colors.white24,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -126,7 +158,7 @@ class BiddingKeypadWidget extends StatelessWidget {
   }
 }
 
-/// 4'lü Ahşap Koz Seçim Paneli (♠, ♥, ♣, ♦)
+/// LIKYA-V2-013 | 4'lü Orijinal Vektör Koz Seçim Paneli (♠, ♥, ♦, ♣)
 class TrumpSelectorWidget extends StatelessWidget {
   final Function(Suit selectedTrump) onTrumpSelected;
 
@@ -135,38 +167,61 @@ class TrumpSelectorWidget extends StatelessWidget {
     required this.onTrumpSelected,
   });
 
+  static const Color _gold = Color(0xFFC9A04A);
+  static const Color _ivory = Color(0xFFF6F1E4);
+  static const Color _ink = Color(0xFF1E1D1F);
+  static const Color _red = Color(0xFFA51C28);
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.5),
+        color: const Color(0xFF16251C).withOpacity(0.95),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.amber.withOpacity(0.7), width: 1.5),
+        border: Border.all(color: _gold, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.6),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            "KOZ SEÇİNİZ",
-            style: TextStyle(
-              color: Colors.amber,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 20, height: 1, color: _gold.withOpacity(0.5)),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  "KOZ SEÇİNİZ",
+                  style: TextStyle(
+                    color: _gold,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+              Container(width: 20, height: 1, color: _gold.withOpacity(0.5)),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildTrumpButton(suit: Suit.spades, symbol: "♠", color: Colors.black),
+              _buildSuitCardButton(suit: Suit.spades, color: _ink),
               const SizedBox(width: 10),
-              _buildTrumpButton(suit: Suit.hearts, symbol: "♥", color: const Color(0xFFD32F2F)),
+              _buildSuitCardButton(suit: Suit.hearts, color: _red),
               const SizedBox(width: 10),
-              _buildTrumpButton(suit: Suit.clubs, symbol: "♣", color: Colors.black),
+              _buildSuitCardButton(suit: Suit.diamonds, color: _red),
               const SizedBox(width: 10),
-              _buildTrumpButton(suit: Suit.diamonds, symbol: "♦", color: const Color(0xFFD32F2F)),
+              _buildSuitCardButton(suit: Suit.clubs, color: _ink),
             ],
           ),
         ],
@@ -174,9 +229,8 @@ class TrumpSelectorWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildTrumpButton({
+  Widget _buildSuitCardButton({
     required Suit suit,
-    required String symbol,
     required Color color,
   }) {
     return Material(
@@ -185,32 +239,24 @@ class TrumpSelectorWidget extends StatelessWidget {
         onTap: () => onTrumpSelected(suit),
         borderRadius: BorderRadius.circular(10),
         child: Ink(
-          width: 52,
-          height: 52,
+          width: 50,
+          height: 58,
           decoration: BoxDecoration(
+            color: _ivory,
             borderRadius: BorderRadius.circular(10),
-            gradient: const LinearGradient(
-              colors: [Color(0xFFE8A838), Color(0xFFB56A15)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            border: Border.all(color: Colors.white70, width: 1.5),
-            boxShadow: const [
+            border: Border.all(color: _gold, width: 1.2),
+            boxShadow: [
               BoxShadow(
-                color: Colors.black45,
-                blurRadius: 4,
-                offset: Offset(1, 2),
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
           child: Center(
-            child: Text(
-              symbol,
-              style: TextStyle(
-                color: color,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
+            child: CustomPaint(
+              size: const Size(26, 26),
+              painter: SuitIconPainter(suit: suit, color: color),
             ),
           ),
         ),

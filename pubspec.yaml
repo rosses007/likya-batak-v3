@@ -1,7 +1,7 @@
 name: batak_app
 description: "Likya Batak card game application"
 publish_to: "none"
-version: 1.0.9+10
+version: 1.2.0+3
 
 environment:
   sdk: ^3.0.0

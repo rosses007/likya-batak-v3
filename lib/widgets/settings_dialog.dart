@@ -109,6 +109,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<BatakGameMode>(
                       value: _gameMode,
+                      isExpanded: true,
                       dropdownColor: const Color(0xFF6A3315),
                       isDense: true,
                       icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
@@ -121,6 +122,10 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         DropdownMenuItem(
                           value: BatakGameMode.partner,
                           child: Text("Eşli Batak (Ortaklı)"),
+                        ),
+                        DropdownMenuItem(
+                          value: BatakGameMode.kozMaca,
+                          child: Text("Koz Maça (İhalesiz)"),
                         ),
                       ],
                       onChanged: (val) {
@@ -140,6 +145,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<int>(
                       value: _rounds,
+                      isExpanded: true,
                       dropdownColor: const Color(0xFF6A3315),
                       isDense: true,
                       icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
@@ -167,6 +173,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<HandLayoutMode>(
                       value: _layoutMode,
+                      isExpanded: true,
                       dropdownColor: const Color(0xFF6A3315),
                       isDense: true,
                       icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
@@ -198,6 +205,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<TableColor>(
                       value: _tableColor,
+                      isExpanded: true,
                       dropdownColor: const Color(0xFF6A3315),
                       isDense: true,
                       icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
@@ -237,6 +245,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<bool>(
                       value: _sortAscending,
+                      isExpanded: true,
                       dropdownColor: const Color(0xFF6A3315),
                       isDense: true,
                       icon: const Icon(Icons.arrow_drop_down, color: Colors.white),

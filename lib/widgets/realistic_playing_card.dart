@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import '../models/card_model.dart';
+import 'card_art/card_face_painters.dart';
+import 'card_art/court_card_painter.dart';
+import 'card_art/suit_shapes.dart';
 
-/// DEV VE GERÇEKÇİ KART TASARIMI
-/// - 52 adet yüksek çözünürlüklü gerçek kâğıt kart görseli (assets/cards/)
-/// - As (A), Papaz (K), Kız (Q), Vale (J) için orijinal resimli tasarımlar
-/// - Dinamik dev boyut (MediaQuery genişliğinin %18'i)
-/// - Gerçekçi BoxShadow ve seçim animasyonu
+/// LIKYA BATAK — PREMIUM KLASİK İSKAMBİL KARTI (V2-011B)
+///
+/// - Fildişi kart kâğıdı, çok hafif doku, ince sıcak gri baskı kenarı
+/// - İnce köşe yuvarlaklığı, kart kalınlığı hissi veren alt kenar çizgisi
+/// - Vektörel (fonttan bağımsız) suit sembolleri
+/// - Geleneksel pip yerleşimi, alt yarıda ters pipler
+/// - Orijinal çift başlı saray kartları (J/Q/K)
+/// - Maça Ası: Likya imza amblemi
+/// - Seçili kart: yalnızca çok ince altın kenar + doğal gölge
 class RealisticPlayingCardWidget extends StatelessWidget {
   final PlayingCard card;
   final double? width;
@@ -24,87 +31,164 @@ class RealisticPlayingCardWidget extends StatelessWidget {
     this.onTap,
   });
 
-  String get assetPath => 'assets/cards/${card.suit.name}_${card.rank.name}.png';
+  static const Color _paper = Color(0xFFFCF9F1);
+  static const Color _paperLow = Color(0xFFF6F1E4);
+  static const Color _edge = Color(0xFFC9C2B3);
+  static const Color _edgeThickness = Color(0xFFB3AA97);
+  static const Color _inkBlack = Color(0xFF1E1D1F);
+  static const Color _inkRed = Color(0xFFA51C28);
+  static const Color _selectGold = Color(0xFFC9A04A);
 
   String get symbol {
     switch (card.suit) {
-      case Suit.spades: return '♠';
-      case Suit.hearts: return '♥';
-      case Suit.diamonds: return '♦';
-      case Suit.clubs: return '♣';
+      case Suit.spades:
+        return '♠';
+      case Suit.hearts:
+        return '♥';
+      case Suit.diamonds:
+        return '♦';
+      case Suit.clubs:
+        return '♣';
     }
   }
 
   String get rankStr {
     switch (card.rank) {
-      case Rank.ace: return 'A';
-      case Rank.king: return 'P';
-      case Rank.queen: return 'K';
-      case Rank.jack: return 'V';
-      default: return (card.rank.index + 2).toString();
+      case Rank.ace:
+        return 'A';
+      case Rank.king:
+        return 'K';
+      case Rank.queen:
+        return 'Q';
+      case Rank.jack:
+        return 'J';
+      case Rank.ten:
+        return '10';
+      case Rank.nine:
+        return '9';
+      case Rank.eight:
+        return '8';
+      case Rank.seven:
+        return '7';
+      case Rank.six:
+        return '6';
+      case Rank.five:
+        return '5';
+      case Rank.four:
+        return '4';
+      case Rank.three:
+        return '3';
+      case Rank.two:
+        return '2';
     }
   }
 
   bool get isRed => card.suit == Suit.hearts || card.suit == Suit.diamonds;
-  Color get suitColor => isRed ? const Color(0xFFD32F2F) : const Color(0xFF1A1A1A);
+
+  Color get suitColor => isRed ? _inkRed : _inkBlack;
+
+  bool get _isCourt =>
+      card.rank == Rank.king ||
+      card.rank == Rank.queen ||
+      card.rank == Rank.jack;
 
   @override
   Widget build(BuildContext context) {
-    Size screenSize = MediaQuery.of(context).size;
-    // Kart genişliği MediaQuery genişliğinin %18'i olacak şekilde dev boyut
-    double finalWidth = width ?? (screenSize.width * 0.18).clamp(78.0, 115.0);
-    double finalHeight = height ?? (finalWidth * 1.38);
-
-    double scale = finalWidth / 75.0;
+    final Size screenSize = MediaQuery.of(context).size;
+    final double w = width ?? (screenSize.width * 0.22).clamp(84.0, 120.0);
+    final double h = height ?? (w * 1.40);
+    final double scale = w / 85.0;
+    final double radius = (4.2 * scale).clamp(3.2, 5.5);
 
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: finalWidth,
-        height: finalHeight,
-        transform: isSelected
-            ? Matrix4.translationValues(0, -14, 0)
-            : Matrix4.identity(),
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        width: w,
+        height: h,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          color: _paper,
+          borderRadius: BorderRadius.circular(radius),
           border: Border.all(
-            color: isSelected
-                ? Colors.amberAccent
-                : (isPlayable ? const Color(0xFFB0B0B0) : const Color(0xFFDCDCDC)),
-            width: isSelected ? 2.5 : 0.8,
+            color: isSelected ? _selectGold : _edge,
+            width: isSelected ? 1.3 : 0.7,
           ),
           boxShadow: [
+            // Kart kalınlığı izlenimi
             BoxShadow(
-              color: isSelected
-                  ? Colors.amber.withOpacity(0.65)
-                  : Colors.black.withOpacity(0.40),
-              blurRadius: isSelected ? 16 : 8,
-              spreadRadius: isSelected ? 2 : 1,
-              offset: const Offset(2, 4),
+              color: _edgeThickness,
+              offset: Offset(0, 0.6 * scale.clamp(1.0, 1.4)),
             ),
+            // Doğal masa gölgesi
+            BoxShadow(
+              color: Colors.black.withOpacity(isSelected ? 0.30 : 0.22),
+              blurRadius: (isSelected ? 7.0 : 4.0) * scale,
+              offset: Offset(0.4 * scale, (isSelected ? 4.0 : 1.8) * scale),
+            ),
+            if (isSelected)
+              BoxShadow(
+                color: _selectGold.withOpacity(0.22),
+                blurRadius: 3 * scale,
+                spreadRadius: 0.4,
+              ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(7.2),
+          borderRadius: BorderRadius.circular(radius - 0.6),
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Gerçek Kart Görseli (Orijinal As, Papaz, Kız, Vale ve Numaralı Kart Çizimleri)
-              Image.asset(
-                assetPath,
-                fit: BoxFit.fill,
-                errorBuilder: (context, error, stackTrace) {
-                  return _buildFallbackCard(scale);
-                },
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [_paper, _paperLow],
+                  ),
+                ),
+              ),
+              const CustomPaint(painter: PaperGrainPainter()),
+
+              // Orta alan
+              if (_isCourt)
+                Positioned(
+                  left: w * 0.195,
+                  right: w * 0.195,
+                  top: h * 0.07,
+                  bottom: h * 0.07,
+                  child: CustomPaint(
+                    painter: CourtCardPainter(rank: card.rank, suit: card.suit),
+                  ),
+                )
+              else if (card.rank == Rank.ace)
+                CustomPaint(
+                  painter: AcePainter(suit: card.suit, color: suitColor),
+                )
+              else
+                CustomPaint(
+                  painter: PipLayoutPainter(
+                    suit: card.suit,
+                    rank: card.rank,
+                    color: suitColor,
+                  ),
+                ),
+
+              // Köşe indeksleri
+              Positioned(
+                top: 3.0 * scale,
+                left: 2.0 * scale,
+                child: _buildIndex(scale),
+              ),
+              Positioned(
+                bottom: 3.0 * scale,
+                right: 2.0 * scale,
+                child: RotatedBox(quarterTurns: 2, child: _buildIndex(scale)),
               ),
 
-              // Oynanamazsa solukluk filtresi
               if (!isPlayable)
-                Container(
-                  color: Colors.black.withOpacity(0.32),
-                ),
+                Container(color: const Color(0xFF0F172A).withOpacity(0.30)),
             ],
           ),
         ),
@@ -112,95 +196,37 @@ class RealisticPlayingCardWidget extends StatelessWidget {
     );
   }
 
-  /// Görsel yüklenemezse devreye giren şık vektörel yedek tasarım
-  Widget _buildFallbackCard(double scale) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFFFFFF),
-            Color(0xFFF7F7F7),
-            Color(0xFFEDEDED),
-          ],
-          stops: [0.0, 0.6, 1.0],
-        ),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
+  /// Dar, sıkı gruplanmış klasik köşe indeksi (rank üstte, suit altında).
+  Widget _buildIndex(double scale) {
+    final bool isTen = card.rank == Rank.ten;
+    return SizedBox(
+      width: 15.0 * scale,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Positioned(
-            top: 5,
-            left: 6,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  rankStr,
-                  style: TextStyle(
-                    fontSize: 18 * scale,
-                    fontWeight: FontWeight.w900,
-                    color: suitColor,
-                    height: 1.0,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  symbol,
-                  style: TextStyle(
-                    fontSize: 16 * scale,
-                    fontWeight: FontWeight.bold,
-                    color: suitColor,
-                    height: 1.0,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            bottom: 5,
-            right: 6,
-            child: RotatedBox(
-              quarterTurns: 2,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    rankStr,
-                    style: TextStyle(
-                      fontSize: 14 * scale,
-                      fontWeight: FontWeight.bold,
-                      color: suitColor,
-                      height: 1.0,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    symbol,
-                    style: TextStyle(
-                      fontSize: 12 * scale,
-                      color: suitColor,
-                      height: 1.0,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Center(
+          Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.diagonal3Values(isTen ? 0.78 : 0.88, 1, 1),
             child: Text(
-              symbol,
+              rankStr,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.visible,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 50 * scale,
-                color: suitColor.withOpacity(0.88),
+                fontSize: (isTen ? 13.5 : 14.5) * scale,
+                fontWeight: FontWeight.w600,
+                color: suitColor,
+                height: 1.0,
+                letterSpacing: isTen ? -0.8 * scale : 0,
                 decoration: TextDecoration.none,
               ),
             ),
+          ),
+          SizedBox(height: 1.2 * scale),
+          CustomPaint(
+            size: Size(9.0 * scale, 9.0 * scale),
+            painter: SuitIconPainter(suit: card.suit, color: suitColor),
           ),
         ],
       ),

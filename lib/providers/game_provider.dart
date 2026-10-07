@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/card_model.dart';
 import '../models/player_model.dart';
@@ -6,6 +7,20 @@ import '../engine/game_engine.dart';
 import '../engine/ai_engine.dart';
 import '../services/sound_service.dart';
 import '../services/api_service.dart';
+import '../engine/scoring_engine.dart';
+import '../engine/game_mode_rules.dart';
+import '../engine/team_engine.dart';
+import '../models/saved_game_model.dart';
+import '../models/bot_memory.dart';
+import '../models/played_card_record.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/ai_difficulty.dart';
+import '../services/game_save_service.dart';
+
+export '../models/ai_difficulty.dart';
+export '../engine/game_mode_rules.dart';
+export '../models/saved_game_model.dart';
+export '../services/game_save_service.dart';
 
 enum GamePhase {
   bidding,         // İhale Aşaması
@@ -16,14 +31,9 @@ enum GamePhase {
   gameOver         // Tüm maç bitti (Örn: 5 turun 5'i de tamamlandı)
 }
 
-enum BatakGameMode {
-  single,   // Tekli İhaleli Batak (Herkes tek)
-  partner   // Eşli Batak (Siz & Arda vs Erol & Uğur)
-}
-
 enum HandLayoutMode {
-  fanned,   // Çapraz / Yelpaze (2. Görseldeki gibi)
-  twoRow    // İki Sıra (1. Görseldeki gibi)
+  fanned,   // Çapraz / Yelpaze
+  twoRow    // İki Sıra
 }
 
 enum TableColor {
@@ -38,6 +48,11 @@ class GameProvider extends ChangeNotifier {
   List<PlayingCard> tableCards = [];
   Map<int, PlayingCard> playedCardsByPlayer = {};
   Suit currentTrump = Suit.spades;
+  List<PlayedCardRecord> playedHistory = [];
+  BotMemory botMemory = BotMemory();
+
+  static const String aiDifficultyKey = 'likya_batak_ai_difficulty';
+  AIDifficulty aiDifficulty = AIDifficulty.normal;
 
   GamePhase currentPhase = GamePhase.bidding;
   BatakGameMode gameMode = BatakGameMode.single;
@@ -55,6 +70,12 @@ class GameProvider extends ChangeNotifier {
   List<int> cumulativeScores = [0, 0, 0, 0];
   int roundCountdown = 3;
 
+  /// Yapısal tur sonuçları geçmişi (LIKYA-V2-003)
+  List<RoundResult> roundResults = [];
+
+  /// Tur puanlama zaten uygulandıysa true; mükerrer puanlama koruması.
+  bool _roundScored = false;
+
   // İhale Durumu
   int biddingTurnIndex = 0;
   int currentHighestBid = 4;
@@ -71,21 +92,103 @@ class GameProvider extends ChangeNotifier {
   // Hızlı bot gecikmesi (300ms - 400ms civarı)
   int get delayBase => (380 / gameSpeed).round();
 
+  // --- LIKYA-V2-002: ASYNC YAŞAM DÖNGÜSÜ & KİLİT KORUMASI ---
+  int _gameGeneration = 0;
+  int get gameGeneration => _gameGeneration;
+  bool _isDisposed = false;
+  bool get isDisposed => _isDisposed;
+  bool _isBotActionRunning = false;
+  bool get isBotActionRunning => _isBotActionRunning;
+  bool _isHumanActionLocked = false;
+  bool get isHumanActionLocked => _isHumanActionLocked;
+  bool _isResolvingTrick = false;
+  bool _isAdvancingRound = false;
+
+  Timer? _botTurnTimer;
+  Timer? _biddingTimer;
+  Timer? _trickResolutionTimer;
+
   GameProvider() {
-    _initializeMatch();
+    _initializeMatch(autoSave: false);
+    unawaited(loadAIDifficulty());
   }
 
-  void _initializeMatch({String? playerName}) {
+  Future<void> setAIDifficulty(AIDifficulty difficulty) async {
+    aiDifficulty = difficulty;
+    _safeNotifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(aiDifficultyKey, difficulty.name);
+    } catch (_) {}
+  }
+
+  Future<void> loadAIDifficulty() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final val = prefs.getString(aiDifficultyKey);
+      aiDifficulty = AIDifficulty.fromString(val);
+      _safeNotifyListeners();
+    } catch (_) {}
+  }
+
+  void _cancelTimers() {
+    _botTurnTimer?.cancel();
+    _botTurnTimer = null;
+    _biddingTimer?.cancel();
+    _biddingTimer = null;
+    _trickResolutionTimer?.cancel();
+    _trickResolutionTimer = null;
+  }
+
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _gameGeneration++;
+    _cancelTimers();
+    super.dispose();
+  }
+
+  void leaveMatch() {
+    _gameGeneration++;
+    _cancelTimers();
+    _isBotActionRunning = false;
+    _isHumanActionLocked = false;
+    _isResolvingTrick = false;
+    _isAdvancingRound = false;
+    tableCards.clear();
+    playedCardsByPlayer.clear();
+    currentPhase = GamePhase.gameOver;
+    statusMessage = "Masadan ayrıldınız.";
+    _safeNotifyListeners();
+    unawaited(deleteSavedGame());
+  }
+
+  void _initializeMatch({String? playerName, bool autoSave = false}) {
+    _cancelTimers();
     if (playerName != null && playerName.trim().isNotEmpty) {
       currentPlayerName = playerName.trim();
     }
     currentRound = 1;
     cumulativeScores = [0, 0, 0, 0];
     roundScoresHistory.clear();
-    _startRound();
+    roundResults.clear();
+    _startRound(autoSave: autoSave);
   }
 
-  void _startRound() {
+  void _startRound({bool autoSave = true}) {
+    _cancelTimers();
+    _isBotActionRunning = false;
+    _isHumanActionLocked = false;
+    _isResolvingTrick = false;
+    _isAdvancingRound = false;
+    _roundScored = false;
+
     Deck deck = Deck();
     deck.shuffle();
     List<List<PlayingCard>> hands = deck.dealCards();
@@ -99,30 +202,73 @@ class GameProvider extends ChangeNotifier {
 
     tableCards.clear();
     playedCardsByPlayer.clear();
+    playedHistory.clear();
     tricksPlayed = 0;
 
-    // Eşli batakta minimum ihale 8'dir, tekli batakta 4'tür (ilk teklif 5 veya 8)
-    currentHighestBid = (gameMode == BatakGameMode.partner) ? 7 : 4;
-    highestBidderIndex = null;
-    passedPlayers.clear();
+    final rules = GameModeRules.forMode(gameMode);
 
-    // Kart dağıtanın solundaki oyuncudan ihale başlar
-    biddingTurnIndex = (currentRound - 1) % 4;
-    currentPhase = GamePhase.bidding;
-    statusMessage = "Tur $currentRound / $totalRounds - İhale Başladı!";
+    if (rules.isFixedTrump) {
+      currentTrump = rules.fixedTrumpSuit ?? Suit.spades;
+    }
 
-    // Kart dağıtma sesi çal
-    SoundService.playCardDeal();
+    botMemory.resetForNewRound(
+      trump: rules.isFixedTrump ? currentTrump : null,
+    );
 
-    notifyListeners();
+    if (!rules.hasBidding) {
+      // Koz Maça (İhalesiz) — İhale aşaması yoktur, doğrudan oyun başlar
+      currentHighestBid = 0;
+      highestBidderIndex = null;
+      bidderIndex = -1;
+      passedPlayers.clear();
 
-    if (players[biddingTurnIndex].isAI) {
-      _processAIBid();
+      // İlk eli dağıtanın solundaki oyuncu başlatır
+      currentTurnIndex = (currentRound - 1) % 4;
+      currentPhase = GamePhase.playing;
+      statusMessage = "Tur $currentRound / $totalRounds - Koz Maça başladı! (Koz: ${_suitName(currentTrump)})";
+
+      SoundService.playCardDeal();
+      _safeNotifyListeners();
+      if (autoSave) {
+        unawaited(autoSaveCurrentGame());
+      }
+
+      if (players[currentTurnIndex].isAI) {
+        _scheduleBotTurn();
+      }
+    } else {
+      // Eşli batakta minimum ihale 8'dir, tekli batakta 4'tür (ilk teklif 5 veya 8)
+      currentHighestBid = (gameMode == BatakGameMode.partner) ? 7 : 4;
+      highestBidderIndex = null;
+      passedPlayers.clear();
+
+      // Kart dağıtanın solundaki oyuncudan ihale başlar
+      biddingTurnIndex = (currentRound - 1) % 4;
+      currentPhase = GamePhase.bidding;
+      statusMessage = "Tur $currentRound / $totalRounds - İhale Başladı!";
+
+      // Kart dağıtma sesi çal
+      SoundService.playCardDeal();
+      _safeNotifyListeners();
+      if (autoSave) {
+        unawaited(autoSaveCurrentGame());
+      }
+
+      if (players[biddingTurnIndex].isAI) {
+        _scheduleBotBid();
+      }
     }
   }
 
   void startNewGame({String? playerName}) {
-    _initializeMatch(playerName: playerName);
+    _gameGeneration++;
+    _cancelTimers();
+    _isBotActionRunning = false;
+    _isHumanActionLocked = false;
+    _isResolvingTrick = false;
+    _isAdvancingRound = false;
+    unawaited(deleteSavedGame());
+    _initializeMatch(playerName: playerName, autoSave: true);
   }
 
   void updateSettings({
@@ -133,6 +279,7 @@ class GameProvider extends ChangeNotifier {
     required BatakGameMode mode,
     required HandLayoutMode layout,
     required TableColor color,
+    AIDifficulty? difficulty,
   }) {
     if (names.isNotEmpty && names[0].isNotEmpty) {
       currentPlayerName = names[0];
@@ -146,31 +293,82 @@ class GameProvider extends ChangeNotifier {
     }
     sortAscending = sortAsc;
     gameSpeed = speed;
-    totalRounds = rounds.clamp(1, 7);
+    totalRounds = rounds;
     gameMode = mode;
     handLayoutMode = layout;
     tableColor = color;
-    notifyListeners();
+    if (difficulty != null) {
+      unawaited(setAIDifficulty(difficulty));
+    } else {
+      _safeNotifyListeners();
+    }
   }
 
   // --- İHALE AŞAMASI METOTLARI ---
 
-  void userPlaceBid(int bid) {
-    if (currentPhase != GamePhase.bidding || biddingTurnIndex != 0) return;
-    if (bid <= currentHighestBid) return;
+  GameActionResult userPlaceBid(int bid) {
+    if (_isHumanActionLocked) {
+      return const GameActionResult.failure("İşlem devam ediyor, lütfen bekleyin.");
+    }
+    _isHumanActionLocked = true;
+    try {
+      if (!GameModeRules.forMode(gameMode).hasBidding) {
+        return const GameActionResult.failure("Bu oyun modunda ihale aşaması yoktur.");
+      }
+      if (currentPhase != GamePhase.bidding) {
+        return const GameActionResult.failure("İhale aşamasında değilsiniz.");
+      }
+      if (biddingTurnIndex != 0) {
+        return const GameActionResult.failure("İhale sırası sizde değil.");
+      }
+      if (passedPlayers.contains(0)) {
+        return const GameActionResult.failure("Zaten pas dediniz.");
+      }
+      if (bid <= currentHighestBid) {
+        return const GameActionResult.failure("Teklif mevcut en yüksek tekliften büyük olmalıdır.");
+      }
+      if (bid > 13) {
+        return const GameActionResult.failure("Batakta maksimum 13 teklif edilebilir.");
+      }
 
-    currentHighestBid = bid;
-    highestBidderIndex = 0;
-    statusMessage = "$currentPlayerName $bid dedi.";
-    _advanceBidding();
+      currentHighestBid = bid;
+      highestBidderIndex = 0;
+      statusMessage = "$currentPlayerName $bid dedi.";
+      _advanceBidding();
+      unawaited(autoSaveCurrentGame());
+      return const GameActionResult.success();
+    } finally {
+      _isHumanActionLocked = false;
+    }
   }
 
-  void userPassBid() {
-    if (currentPhase != GamePhase.bidding || biddingTurnIndex != 0) return;
+  GameActionResult userPassBid() {
+    if (_isHumanActionLocked) {
+      return const GameActionResult.failure("İşlem devam ediyor, lütfen bekleyin.");
+    }
+    _isHumanActionLocked = true;
+    try {
+      if (!GameModeRules.forMode(gameMode).hasBidding) {
+        return const GameActionResult.failure("Bu oyun modunda ihale aşaması yoktur.");
+      }
+      if (currentPhase != GamePhase.bidding) {
+        return const GameActionResult.failure("İhale aşamasında değilsiniz.");
+      }
+      if (biddingTurnIndex != 0) {
+        return const GameActionResult.failure("İhale sırası sizde değil.");
+      }
+      if (passedPlayers.contains(0)) {
+        return const GameActionResult.failure("Zaten pas dediniz.");
+      }
 
-    passedPlayers.add(0);
-    statusMessage = "$currentPlayerName Pas dedi.";
-    _advanceBidding();
+      passedPlayers.add(0);
+      statusMessage = "$currentPlayerName Pas dedi.";
+      _advanceBidding();
+      unawaited(autoSaveCurrentGame());
+      return const GameActionResult.success();
+    } finally {
+      _isHumanActionLocked = false;
+    }
   }
 
   void _advanceBidding() {
@@ -190,75 +388,121 @@ class GameProvider extends ChangeNotifier {
       biddingTurnIndex = (biddingTurnIndex + 1) % 4;
     } while (passedPlayers.contains(biddingTurnIndex));
 
-    notifyListeners();
-    _processAIBid();
+    _safeNotifyListeners();
+    unawaited(autoSaveCurrentGame());
+    _scheduleBotBid();
   }
 
-  Future<void> _processAIBid() async {
+  void _scheduleBotBid() {
+    if (_isDisposed || currentPhase != GamePhase.bidding) return;
+    if (players.isEmpty || biddingTurnIndex >= players.length) return;
+    if (!players[biddingTurnIndex].isAI) return;
+
+    _biddingTimer?.cancel();
+    final int generation = _gameGeneration;
+
+    _biddingTimer = Timer(Duration(milliseconds: delayBase), () {
+      _executeBotBid(generation);
+    });
+  }
+
+  void _executeBotBid(int generation) {
+    if (_isDisposed || generation != _gameGeneration) return;
     if (currentPhase != GamePhase.bidding) return;
-    Player currentBot = players[biddingTurnIndex];
+    if (players.isEmpty || biddingTurnIndex >= players.length) return;
+    final Player currentBot = players[biddingTurnIndex];
     if (!currentBot.isAI) return;
 
-    await Future.delayed(Duration(milliseconds: delayBase));
+    final int? recommendedBid = AIEngine.recommendBid(
+      hand: currentBot.hand,
+      currentHighestBid: currentHighestBid,
+      gameMode: gameMode,
+      difficulty: aiDifficulty,
+    );
 
-    int maxSuitCount = 0;
-    for (var suit in Suit.values) {
-      int count = currentBot.hand.where((c) => c.suit == suit).length;
-      if (count > maxSuitCount) maxSuitCount = count;
-    }
-    int highCards = currentBot.hand.where((c) => c.power >= Rank.jack.index).length;
-
-    int maxBidLimit = (gameMode == BatakGameMode.partner) ? 9 : 7;
-    bool willBid = (maxSuitCount >= 5 || highCards >= 4) && currentHighestBid < maxBidLimit;
-
-    if (willBid) {
-      int newBid = currentHighestBid + 1;
-      currentHighestBid = newBid;
+    if (recommendedBid != null &&
+        recommendedBid > currentHighestBid &&
+        recommendedBid <= 13) {
+      currentHighestBid = recommendedBid;
       highestBidderIndex = biddingTurnIndex;
-      statusMessage = "${currentBot.name} $newBid dedi.";
+      statusMessage = "${currentBot.name} $recommendedBid dedi.";
     } else {
       passedPlayers.add(biddingTurnIndex);
       statusMessage = "${currentBot.name} Pas dedi.";
     }
 
     _advanceBidding();
+    unawaited(autoSaveCurrentGame());
   }
 
   void _concludeBidding() {
     bidderIndex = highestBidderIndex ?? 0;
     players[bidderIndex].bid = currentHighestBid;
 
+    final TeamId? bidTeam = (gameMode == BatakGameMode.partner)
+        ? TeamEngine.teamForPlayer(bidderIndex)
+        : null;
+
     if (bidderIndex == 0) {
       currentPhase = GamePhase.trumpSelection;
       statusMessage = "İhaleyi $currentHighestBid ile kazandınız! Koz seçin.";
-      notifyListeners();
+      botMemory.setPublicBidState(
+        bidderIndex: bidderIndex,
+        winningBid: currentHighestBid,
+        biddingTeam: bidTeam,
+        trump: null,
+      );
+      _safeNotifyListeners();
+      unawaited(autoSaveCurrentGame());
     } else {
       Player winningBot = players[bidderIndex];
-      Suit bestSuit = Suit.spades;
-      int maxCount = -1;
-      for (var s in Suit.values) {
-        int cnt = winningBot.hand.where((c) => c.suit == s).length;
-        if (cnt > maxCount) {
-          maxCount = cnt;
-          bestSuit = s;
-        }
-      }
-      currentTrump = bestSuit;
+      currentTrump = AIEngine.chooseTrump(
+        winningBot,
+        difficulty: aiDifficulty,
+        winningBid: currentHighestBid,
+      );
       currentPhase = GamePhase.playing;
       currentTurnIndex = bidderIndex;
+      botMemory.setPublicBidState(
+        bidderIndex: bidderIndex,
+        winningBid: currentHighestBid,
+        biddingTeam: bidTeam,
+        trump: currentTrump,
+      );
       statusMessage = "${winningBot.name} $currentHighestBid ile ihaleyi aldı. Koz: ${_suitName(currentTrump)}";
-      notifyListeners();
-      _checkBotTurn();
+      _safeNotifyListeners();
+      unawaited(autoSaveCurrentGame());
+      _scheduleBotTurn();
     }
   }
 
-  void userSelectTrump(Suit suit) {
-    if (currentPhase != GamePhase.trumpSelection) return;
-    currentTrump = suit;
-    currentPhase = GamePhase.playing;
-    currentTurnIndex = bidderIndex;
-    statusMessage = "Koz: ${_suitName(currentTrump)}. Oyun başladı!";
-    notifyListeners();
+  GameActionResult userSelectTrump(Suit suit) {
+    if (_isHumanActionLocked) {
+      return const GameActionResult.failure("İşlem devam ediyor, lütfen bekleyin.");
+    }
+    _isHumanActionLocked = true;
+    try {
+      if (GameModeRules.forMode(gameMode).isFixedTrump) {
+        return const GameActionResult.failure("Bu oyun modunda koz sabittir ve değiştirilemez.");
+      }
+      if (currentPhase != GamePhase.trumpSelection) {
+        return const GameActionResult.failure("Koz seçim aşamasında değilsiniz.");
+      }
+      if (bidderIndex != 0) {
+        return const GameActionResult.failure("Kozu yalnızca ihaleyi kazanan oyuncu seçebilir.");
+      }
+
+      currentTrump = suit;
+      botMemory.trump = suit;
+      currentPhase = GamePhase.playing;
+      currentTurnIndex = bidderIndex;
+      statusMessage = "Koz: ${_suitName(currentTrump)}. Oyun başladı!";
+      _safeNotifyListeners();
+      unawaited(autoSaveCurrentGame());
+      return const GameActionResult.success();
+    } finally {
+      _isHumanActionLocked = false;
+    }
   }
 
   String _suitName(Suit s) {
@@ -272,154 +516,435 @@ class GameProvider extends ChangeNotifier {
 
   // --- KART OYNAMA METOTLARI ---
 
-  Future<void> playCard(Player player, PlayingCard card) async {
+  /// Oyuncunun kurallara uygun olarak oynayabileceği geçerli kartları döner.
+  List<PlayingCard> getValidMovesForPlayer(Player player) {
+    if (currentPhase != GamePhase.playing || players.isEmpty || players[currentTurnIndex] != player) {
+      return const [];
+    }
+    return GameEngine.getValidMoves(
+      hand: player.hand,
+      tableCards: tableCards,
+      trumpSuit: currentTrump,
+    );
+  }
+
+  Future<GameActionResult> playCard(Player player, PlayingCard card) async {
+    if (!player.isAI) {
+      if (_isHumanActionLocked) {
+        return const GameActionResult.failure("İşlem devam ediyor, lütfen bekleyin.");
+      }
+      _isHumanActionLocked = true;
+    }
+    try {
+      return await _playCardInternal(player, card, _gameGeneration);
+    } finally {
+      if (!player.isAI) {
+        _isHumanActionLocked = false;
+      }
+    }
+  }
+
+  Future<GameActionResult> _playCardInternal(Player player, PlayingCard card, int generation) async {
+    if (_isDisposed || generation != _gameGeneration) {
+      return const GameActionResult.failure("Oyun oturumu geçerli değil.");
+    }
+    if (_isResolvingTrick) {
+      return const GameActionResult.failure("Önceki el toplanıyor, lütfen bekleyin.");
+    }
+
+    // 1. Durum / Yetki / Kural Kontrolleri (Mutation öncesi mutlak doğrulama)
+    final validation = GameEngine.validatePlay(
+      cardToPlay: card,
+      player: player,
+      tableCards: tableCards,
+      trumpSuit: currentTrump,
+      isCurrentTurn: players.isNotEmpty && players[currentTurnIndex] == player,
+      isPlayingPhase: currentPhase == GamePhase.playing,
+    );
+
+    if (!validation.success) {
+      return validation;
+    }
+
+    // Eldeki kart sayısı kontrolü (kart elde tam 1 kez bulunmalı)
+    if (player.hand.where((c) => c == card).length != 1) {
+      return const GameActionResult.failure("Kart elinizde tutarlı değil.");
+    }
+
+    // 2. Geçerli hamle: State mutasyonu
+    final Suit? leadSuit = tableCards.isEmpty ? null : tableCards.first.suit;
+    final int trickNumber = tricksPlayed;
+    final int playerIndex = currentTurnIndex;
+
+    final int leadPlayerIndex = (tableCards.isEmpty)
+        ? currentTurnIndex
+        : (currentTurnIndex - tableCards.length + 4) % 4;
+
     player.hand.remove(card);
     tableCards.add(card);
     playedCardsByPlayer[currentTurnIndex] = card;
 
+    final record = PlayedCardRecord(
+      playerIndex: playerIndex,
+      card: card,
+      trickNumber: trickNumber,
+    );
+    if (!playedHistory.any((r) => r.card == card && r.trickNumber == trickNumber)) {
+      playedHistory.add(record);
+    }
+    botMemory.recordPlay(
+      playerIndex: playerIndex,
+      card: card,
+      leadSuit: leadSuit,
+      trickNumber: trickNumber,
+    );
+
     // Gerçekçi kart atma sesi
     await SoundService.playCardThrow();
 
-    notifyListeners();
+    if (_isDisposed || generation != _gameGeneration) {
+      return const GameActionResult.success();
+    }
+
+    _safeNotifyListeners();
 
     if (tableCards.length == 4) {
       currentPhase = GamePhase.trickFinished;
-      notifyListeners();
+      _isResolvingTrick = true;
+      _safeNotifyListeners();
 
-      await Future.delayed(Duration(milliseconds: (delayBase * 1.6).round()));
+      _trickResolutionTimer?.cancel();
+      _trickResolutionTimer = Timer(Duration(milliseconds: (delayBase * 1.6).round()), () async {
+        if (_isDisposed || generation != _gameGeneration) return;
+        try {
+          int actualWinnerIdx = GameEngine.determineTrickWinnerPlayerIndex(
+            tableCards: tableCards,
+            trumpSuit: currentTrump,
+            leadPlayerIndex: leadPlayerIndex,
+          );
 
-      int roundWinnerIdx = GameEngine.determineWinnerIndex(tableCards, currentTrump);
-      int actualWinnerIdx = (currentTurnIndex - 3 + roundWinnerIdx) % 4;
-      if (actualWinnerIdx < 0) actualWinnerIdx += 4;
+          players[actualWinnerIdx].tricksWon++;
 
-      players[actualWinnerIdx].tricksWon++;
+          await SoundService.playChipsCollect();
 
-      await SoundService.playChipsCollect();
+          if (_isDisposed || generation != _gameGeneration) return;
 
-      statusMessage = "Eli ${players[actualWinnerIdx].name} aldı!";
-      tableCards.clear();
-      playedCardsByPlayer.clear();
+          botMemory.recordTrickWinner(actualWinnerIdx, trickNumber: tricksPlayed);
 
-      currentTurnIndex = actualWinnerIdx;
-      tricksPlayed++;
+          statusMessage = "Eli ${players[actualWinnerIdx].name} aldı!";
+          tableCards.clear();
+          playedCardsByPlayer.clear();
 
-      if (tricksPlayed == 13) {
-        await _finishRound();
-      } else {
-        currentPhase = GamePhase.playing;
-        notifyListeners();
-        _checkBotTurn();
-      }
+          currentTurnIndex = actualWinnerIdx;
+          tricksPlayed++;
+          _isResolvingTrick = false;
+          unawaited(autoSaveCurrentGame());
+
+          if (tricksPlayed == 13) {
+            await _finishRound(generation);
+          } else {
+            currentPhase = GamePhase.playing;
+            _safeNotifyListeners();
+            _scheduleBotTurn();
+          }
+        } finally {
+          _isResolvingTrick = false;
+        }
+      });
     } else {
       currentTurnIndex = (currentTurnIndex + 1) % 4;
-      notifyListeners();
-      _checkBotTurn();
+      _safeNotifyListeners();
+      unawaited(autoSaveCurrentGame());
+      _scheduleBotTurn();
     }
+
+    return const GameActionResult.success();
   }
 
-  void _checkBotTurn() async {
-    if (currentPhase != GamePhase.playing) return;
-    Player currentPlayer = players[currentTurnIndex];
-    if (currentPlayer.isAI) {
-      await Future.delayed(Duration(milliseconds: delayBase));
-      PlayingCard cardToPlay = AIEngine.chooseCard(
-        bot: currentPlayer,
+  void _scheduleBotTurn() {
+    if (_isDisposed || currentPhase != GamePhase.playing) return;
+    if (players.isEmpty || currentTurnIndex >= players.length) return;
+    if (!players[currentTurnIndex].isAI) return;
+    if (_isResolvingTrick) return;
+
+    _botTurnTimer?.cancel();
+    final int generation = _gameGeneration;
+
+    _botTurnTimer = Timer(Duration(milliseconds: delayBase), () {
+      _executeBotTurn(generation);
+    });
+  }
+
+  Future<void> _executeBotTurn(int generation) async {
+    if (_isDisposed || generation != _gameGeneration) return;
+    if (_isBotActionRunning || _isResolvingTrick) return;
+
+    _isBotActionRunning = true;
+    try {
+      if (_isDisposed || generation != _gameGeneration) return;
+      if (currentPhase != GamePhase.playing) return;
+      if (players.isEmpty || currentTurnIndex >= players.length) return;
+
+      final Player currentBot = players[currentTurnIndex];
+      if (!currentBot.isAI) return;
+      if (currentBot.hand.isEmpty) return;
+
+      // STEP 7: Select card AFTER delay and revalidation
+      // Eşli modda partner bilgisi iletilir (LIKYA-V2-004)
+      final int? leadIdx = tableCards.isEmpty
+          ? null
+          : (currentTurnIndex - tableCards.length + 4) % 4;
+      final PlayingCard cardToPlay = AIEngine.chooseCard(
+        bot: currentBot,
         tableCards: tableCards,
         trumpSuit: currentTrump,
+        botPlayerIndex: gameMode == BatakGameMode.partner ? currentTurnIndex : null,
+        playedCardsByPlayer: gameMode == BatakGameMode.partner ? playedCardsByPlayer : null,
+        leadPlayerIndex: gameMode == BatakGameMode.partner ? leadIdx : null,
+        memory: botMemory,
+        difficulty: aiDifficulty,
       );
-      await playCard(currentPlayer, cardToPlay);
+
+      // STEP 6: Revalidate card before playing
+      if (!currentBot.hand.contains(cardToPlay)) return;
+
+      await _playCardInternal(currentBot, cardToPlay, generation);
+    } finally {
+      _isBotActionRunning = false;
     }
   }
 
   // --- TUR & PUAN HESAPLAMA METOTLARI ---
 
-  Future<void> _finishRound() async {
-    currentPhase = GamePhase.roundFinished;
+  Future<void> _finishRound(int generation) async {
+    if (_isAdvancingRound) return;
+    _isAdvancingRound = true;
+    try {
+      // Mükerrer puanlama koruması (LIKYA-V2-003)
+      if (_roundScored) return;
+      _roundScored = true;
 
-    List<int> roundScores = [0, 0, 0, 0];
+      currentPhase = GamePhase.roundFinished;
 
-    if (gameMode == BatakGameMode.single) {
-      // Tekli Batak Puanı
-      for (int i = 0; i < 4; i++) {
-        int score = GameEngine.calculateScore(players[i], i == bidderIndex);
-        roundScores[i] = score;
-        cumulativeScores[i] += score;
-      }
-    } else {
-      // Eşli Batak Puanı (Takım 1: Siz [0] & Arda [2] vs Takım 2: Erol [1] & Uğur [3])
-      int team1Tricks = players[0].tricksWon + players[2].tricksWon;
-      int team2Tricks = players[1].tricksWon + players[3].tricksWon;
-
-      bool team1Bidder = (bidderIndex == 0 || bidderIndex == 2);
-      int bid = players[bidderIndex].bid;
-
-      int team1Score = 0;
-      int team2Score = 0;
-
-      if (team1Bidder) {
-        if (team1Tricks >= bid) {
-          team1Score = (bid * 10) + (team1Tricks - bid);
-        } else {
-          team1Score = -(bid * 10);
-        }
-        team2Score = team2Tricks * 10;
-      } else {
-        if (team2Tricks >= bid) {
-          team2Score = (bid * 10) + (team2Tricks - bid);
-        } else {
-          team2Score = -(bid * 10);
-        }
-        team1Score = team1Tricks * 10;
-      }
-
-      roundScores = [team1Score, team2Score, team1Score, team2Score];
-      for (int i = 0; i < 4; i++) {
-        cumulativeScores[i] += roundScores[i];
-      }
-    }
-
-    roundScoresHistory.add(roundScores);
-    statusMessage = "Tur $currentRound tamamlandı! Puanlar hesaplandı.";
-    notifyListeners();
-
-    // 2. Eli / Sonraki eli otomatik başlatma akışı
-    if (currentRound < totalRounds) {
-      // 3.5 saniye yazboz puanlarını göster, sonra otomatik yeni eli başlat
-      for (int sec = 3; sec > 0; sec--) {
-        roundCountdown = sec;
-        notifyListeners();
-        await Future.delayed(const Duration(seconds: 1));
-      }
-      currentRound++;
-      _startRound();
-    } else {
-      // Tüm eller tamamlandı -> Şampiyonluk Ekranı
-      currentPhase = GamePhase.gameOver;
-      statusMessage = "Tüm turlar tamamlandı! Şampiyon belli oldu.";
-      notifyListeners();
-
-      int highest = -9999;
-      int winner = 0;
-      for (int i = 0; i < 4; i++) {
-        if (cumulativeScores[i] > highest) {
-          highest = cumulativeScores[i];
-          winner = i;
-        }
-      }
-      try {
-        await ApiService.saveMatchScore(
-          isMultiplayer: false,
+      // ScoringEngine ile saf puan hesaplama (LIKYA-V2-003 & LIKYA-V2-005)
+      RoundResult result;
+      if (gameMode == BatakGameMode.single) {
+        result = ScoringEngine.computeSingleModeRound(
           players: players,
-          winnerIndex: winner,
+          bidderIndex: bidderIndex,
+          bid: players[bidderIndex].bid,
+          trump: currentTrump,
+          roundNumber: currentRound,
+          prevCumulativeScores: List.of(cumulativeScores),
         );
-      } catch (_) {}
+      } else if (gameMode == BatakGameMode.partner) {
+        result = ScoringEngine.computePartnerModeRound(
+          players: players,
+          bidderIndex: bidderIndex,
+          bid: players[bidderIndex].bid,
+          trump: currentTrump,
+          roundNumber: currentRound,
+          prevCumulativeScores: List.of(cumulativeScores),
+        );
+      } else if (gameMode == BatakGameMode.kozMaca) {
+        result = ScoringEngine.computeKozMacaRound(
+          players: players,
+          roundNumber: currentRound,
+          prevCumulativeScores: List.of(cumulativeScores),
+        );
+      } else {
+        result = ScoringEngine.computeSingleModeRound(
+          players: players,
+          bidderIndex: bidderIndex >= 0 ? bidderIndex : 0,
+          bid: bidderIndex >= 0 ? players[bidderIndex].bid : 0,
+          trump: currentTrump,
+          roundNumber: currentRound,
+          prevCumulativeScores: List.of(cumulativeScores),
+        );
+      }
+
+      // Sonuçları state'e yaz
+      cumulativeScores = List.of(result.cumulativeScores);
+      roundScoresHistory.add(result.scoreDeltaByPlayer);
+      roundResults.add(result);
+
+      statusMessage = "Tur $currentRound tamamlandı! Puanlar hesaplandı.";
+      _safeNotifyListeners();
+      unawaited(autoSaveCurrentGame());
+
+      // Sonraki eli otomatik başlatma akışı
+      if (currentRound < totalRounds) {
+        // 3 saniye yazboz puanlarını göster, sonra otomatik yeni eli başlat
+        for (int sec = 3; sec > 0; sec--) {
+          if (_isDisposed || generation != _gameGeneration) return;
+          roundCountdown = sec;
+          _safeNotifyListeners();
+          await Future.delayed(const Duration(seconds: 1));
+        }
+        if (_isDisposed || generation != _gameGeneration) return;
+        currentRound++;
+        _startRound();
+      } else {
+        // Tüm eller tamamlandı → Şampiyonluk Ekranı
+        currentPhase = GamePhase.gameOver;
+        statusMessage = "Tüm turlar tamamlandı! Şampiyon belli oldu.";
+        _safeNotifyListeners();
+        unawaited(deleteSavedGame());
+
+        // NON-AUTHORITATIVE SIDE EFFECT: Ağ kaydı (LIKYA-V2-003 §15)
+        // Bu çağrı: yerel kazananı belirleme, oyun tamamlamayı engelleme,
+        // ve puan mutasyonu yapmaz. Ağ hatası offline oyunu bozmaz.
+        final int winner = ScoringEngine.determineWinnerIndex(cumulativeScores);
+        try {
+          await ApiService.saveMatchScore(
+            isMultiplayer: false,
+            players: players,
+            winnerIndex: winner,
+          );
+        } catch (_) {}
+      }
+    } finally {
+      _isAdvancingRound = false;
     }
   }
 
   void startNextRoundImmediately() {
     if (currentPhase == GamePhase.roundFinished && currentRound < totalRounds) {
+      _cancelTimers();
+      _gameGeneration++;
+      _isAdvancingRound = false;
       currentRound++;
       _startRound();
     }
+  }
+
+  // ============================================================
+  // DURUM KAYIT VE DEVAM ET (SAVE & RESUME) METOTLARI (LIKYA-V2-006)
+  // ============================================================
+
+  /// Mevcut oyun durumunu SavedGameModel nesnesine dönüştürür.
+  SavedGameModel toSavedGameModel() {
+    return SavedGameModel(
+      savedAt: DateTime.now().toIso8601String(),
+      gameMode: gameMode,
+      currentPhase: currentPhase,
+      totalRounds: totalRounds,
+      currentRound: currentRound,
+      currentTurnIndex: currentTurnIndex,
+      biddingTurnIndex: biddingTurnIndex,
+      currentHighestBid: currentHighestBid,
+      highestBidderIndex: highestBidderIndex,
+      bidderIndex: bidderIndex,
+      passedPlayers: List.of(passedPlayers),
+      currentTrump: currentTrump,
+      tricksPlayed: tricksPlayed,
+      players: players.map((p) => Player(
+        id: p.id,
+        name: p.name,
+        isAI: p.isAI,
+        hand: List.of(p.hand),
+        bid: p.bid,
+        tricksWon: p.tricksWon,
+      )).toList(),
+      tableCards: List.of(tableCards),
+      playedCardsByPlayer: Map.of(playedCardsByPlayer),
+      playedHistory: List.unmodifiable(playedHistory),
+      cumulativeScores: List.of(cumulativeScores),
+      roundScoresHistory: roundScoresHistory.map((h) => List.of(h)).toList(),
+      roundResults: List.of(roundResults),
+      roundScored: _roundScored,
+      statusMessage: statusMessage,
+    );
+  }
+
+  /// Doğrulanmış SavedGameModel nesnesinden oyun durumunu geri yükler.
+  void restoreFromSavedGame(SavedGameModel model) {
+    _gameGeneration++;
+    _cancelTimers();
+    _isBotActionRunning = false;
+    _isHumanActionLocked = false;
+    _isResolvingTrick = false;
+    _isAdvancingRound = false;
+
+    gameMode = model.gameMode;
+    currentPhase = model.currentPhase;
+    totalRounds = model.totalRounds;
+    currentRound = model.currentRound;
+    currentTurnIndex = model.currentTurnIndex;
+    biddingTurnIndex = model.biddingTurnIndex;
+    currentHighestBid = model.currentHighestBid;
+    highestBidderIndex = model.highestBidderIndex;
+    bidderIndex = model.bidderIndex;
+    passedPlayers = Set<int>.from(model.passedPlayers);
+    currentTrump = model.currentTrump;
+    tricksPlayed = model.tricksPlayed;
+    players = model.players.map((p) => Player(
+      id: p.id,
+      name: p.name,
+      isAI: p.isAI,
+      hand: List.of(p.hand),
+      bid: p.bid,
+      tricksWon: p.tricksWon,
+    )).toList();
+    tableCards = List.of(model.tableCards);
+    playedCardsByPlayer = Map.of(model.playedCardsByPlayer);
+    playedHistory = List.of(model.playedHistory);
+    cumulativeScores = List.of(model.cumulativeScores);
+    roundScoresHistory = model.roundScoresHistory.map((h) => List.of(h)).toList();
+    roundResults = List.of(model.roundResults);
+    _roundScored = model.roundScored;
+    statusMessage = model.statusMessage;
+
+    final restoredBidder = model.bidderIndex >= 0 ? model.bidderIndex : null;
+    final TeamId? restoredBiddingTeam = (model.gameMode == BatakGameMode.partner && restoredBidder != null)
+        ? TeamEngine.teamForPlayer(restoredBidder)
+        : null;
+
+    final Map<int, int> restoredTricksWon = {};
+    for (int i = 0; i < players.length; i++) {
+      if (players[i].tricksWon > 0) {
+        restoredTricksWon[i] = players[i].tricksWon;
+      }
+    }
+
+    botMemory.reconstructFromHistory(
+      playedHistory,
+      trump: model.currentTrump,
+      bidderIdx: restoredBidder,
+      winBid: (model.gameMode != BatakGameMode.kozMaca && restoredBidder != null) ? model.currentHighestBid : null,
+      bidTeam: restoredBiddingTeam,
+      tricksWon: restoredTricksWon,
+    );
+
+    _safeNotifyListeners();
+
+    // Restorasyon sonrası bot sırası ise bot eylemini yeniden planla
+    if (currentPhase == GamePhase.bidding) {
+      if (players.isNotEmpty && biddingTurnIndex < players.length && players[biddingTurnIndex].isAI) {
+        _scheduleBotBid();
+      }
+    } else if (currentPhase == GamePhase.playing) {
+      if (players.isNotEmpty && currentTurnIndex < players.length && players[currentTurnIndex].isAI && !_isResolvingTrick) {
+        _scheduleBotTurn();
+      }
+    }
+  }
+
+  /// Aktif oyunu otomatik olarak diske kaydeder (asenkron, non-blocking).
+  Future<void> autoSaveCurrentGame() async {
+    if (_isDisposed || currentPhase == GamePhase.gameOver) {
+      await GameSaveService.deleteSave();
+      return;
+    }
+    if (gameMode == BatakGameMode.gommeli) return;
+    try {
+      final model = toSavedGameModel();
+      await GameSaveService.saveGame(model);
+    } catch (_) {}
+  }
+
+  /// Kaydedilmiş oyunu siler.
+  Future<void> deleteSavedGame() async {
+    await GameSaveService.deleteSave();
   }
 }

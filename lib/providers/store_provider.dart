@@ -12,8 +12,7 @@ class StoreProvider extends ChangeNotifier {
   
   // Mağazalarda oluşturulabilecek abonelik ürün kimlikleri
   final Set<String> _vipProductIds = {
-    'batak_pro_vip_monthly',
-    'batak_noir_vip_monthly',
+    'likya_batak_vip_monthly',
   };
 
   StoreProvider() {

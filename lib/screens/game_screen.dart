@@ -11,6 +11,7 @@ import '../widgets/fanned_hand_view.dart';
 import '../widgets/game_action_panels.dart';
 import '../widgets/settings_dialog.dart';
 import '../widgets/scoreboard_dialog.dart';
+import '../widgets/card_art/suit_shapes.dart';
 
 class BatakGameScreen extends StatefulWidget {
   const BatakGameScreen({super.key});
@@ -19,7 +20,31 @@ class BatakGameScreen extends StatefulWidget {
   State<BatakGameScreen> createState() => _BatakGameScreenState();
 }
 
-class _BatakGameScreenState extends State<BatakGameScreen> {
+class _BatakGameScreenState extends State<BatakGameScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      if (mounted) {
+        final provider = Provider.of<GameProvider>(context, listen: false);
+        provider.autoSaveCurrentGame();
+      }
+    }
+  }
+
   void _openSettings(BuildContext context, GameProvider provider) {
     showDialog(
       context: context,
@@ -104,7 +129,7 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
                       // Arka Plan Çuha & Ahşap Kenarlık (Seçilen renge göre)
                       _buildTableFeltBackground(gameProvider.tableColor),
 
-                      // Üst Bar: Bilgi, Yazboz & Ayarlar (Daha belirgin, büyük ve okunaklı)
+                      // Üst Bar: Bilgi, Yazboz & Ayarlar (Kompakt, taşma yapmayan premium HUD)
                       Positioned(
                         top: 8,
                         left: 10,
@@ -113,107 +138,111 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             // Geri / Çıkış butonu
-                            IconButton(
-                              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 22),
+                            _buildTopBarButton(
+                              icon: Icons.arrow_back_ios_new,
+                              iconSize: 16,
                               onPressed: () => Navigator.pop(context),
+                              tooltip: 'Çıkış',
                             ),
 
                             // Mod & Tur & Koz Göstergesi
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF5D2E15), Color(0xFF381504)],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF2C2218), Color(0xFF1A140E)],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFFC9A04A), width: 1.2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.5),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
                                 ),
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(color: const Color(0xFFFFD54F), width: 1.5),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.5),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Oyun Modu Etiketi
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: gameProvider.gameMode == BatakGameMode.partner
-                                          ? const Color(0xFF1565C0)
-                                          : const Color(0xFF2E7D32),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      gameProvider.gameMode == BatakGameMode.partner ? "EŞLİ" : "TEKLİ",
-                                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    "Tur: ${gameProvider.currentRound}/${gameProvider.totalRounds}",
-                                    style: const TextStyle(
-                                      color: Colors.amberAccent,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Text("|", style: TextStyle(color: Colors.white38, fontSize: 14)),
-                                  const SizedBox(width: 8),
-                                  Row(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.center,
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const Text(
-                                        "Koz: ",
-                                        style: TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 13,
+                                      // Oyun Modu Etiketi
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                        decoration: BoxDecoration(
+                                          color: gameProvider.gameMode == BatakGameMode.partner
+                                              ? const Color(0xFF1565C0)
+                                              : (gameProvider.gameMode == BatakGameMode.kozMaca
+                                                  ? const Color(0xFF5E35B1)
+                                                  : const Color(0xFF2E7D32)),
+                                          borderRadius: BorderRadius.circular(5),
+                                        ),
+                                        child: Text(
+                                          GameModeRules.forMode(gameProvider.gameMode).shortBadge,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        screenSize.width < 360
+                                            ? "T:${gameProvider.currentRound}/${gameProvider.totalRounds}"
+                                            : "Tur: ${gameProvider.currentRound}/${gameProvider.totalRounds}",
+                                        style: const TextStyle(
+                                          color: Color(0xFFFFD54F),
+                                          fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 5),
+                                        child: Text("|", style: TextStyle(color: Colors.white24, fontSize: 12)),
+                                      ),
+                                      _buildTrumpHudItem(gameProvider, compact: screenSize.width < 360),
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 5),
+                                        child: Text("|", style: TextStyle(color: Colors.white24, fontSize: 12)),
+                                      ),
                                       Text(
-                                        _getSuitSymbol(gameProvider.currentTrump),
-                                        style: TextStyle(
-                                          color: _getSuitColor(gameProvider.currentTrump),
-                                          fontSize: 18,
+                                        "${gameProvider.tricksPlayed}/13",
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Text("|", style: TextStyle(color: Colors.white38, fontSize: 14)),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    "${gameProvider.tricksPlayed}/13",
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
 
+                            // Sağ butonlar: Yazboz & Ayarlar
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // Yazboz Butonu
-                                IconButton(
-                                  icon: const Icon(Icons.edit_note, color: Colors.amber, size: 28),
+                                _buildTopBarButton(
+                                  icon: Icons.edit_note,
+                                  iconSize: 22,
+                                  color: const Color(0xFFC9A04A),
                                   onPressed: () => _showScoreboard(context, gameProvider),
+                                  tooltip: 'Yazboz',
                                 ),
-                                // Ayarlar (Dişli Çark) Butonu
-                                IconButton(
-                                  icon: const Icon(Icons.settings, color: Colors.amber, size: 24),
+                                const SizedBox(width: 4),
+                                _buildTopBarButton(
+                                  icon: Icons.settings,
+                                  iconSize: 18,
+                                  color: const Color(0xFFC9A04A),
                                   onPressed: () => _openSettings(context, gameProvider),
+                                  tooltip: 'Ayarlar',
                                 ),
                               ],
                             ),
@@ -221,7 +250,7 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
                         ),
                       ),
 
-                      // 1. ÜST OYUNCU (Arda)
+                      // 1. ÜST OYUNCU (Arda / Eş)
                       Align(
                         alignment: Alignment.topCenter,
                         child: Padding(
@@ -230,12 +259,12 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
                             player: topPlayer,
                             playerIndex: 2,
                             gameProvider: gameProvider,
-                            subtitle: gameProvider.gameMode == BatakGameMode.partner ? "EŞİNİZ" : null,
+                            subtitle: gameProvider.gameMode == BatakGameMode.partner ? "EŞİNİZ (BİZ)" : null,
                           ),
                         ),
                       ),
 
-                      // 2. SOL OYUNCU (Erol)
+                      // 2. SOL OYUNCU (Erol / Rakip)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Padding(
@@ -245,11 +274,12 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
                             playerIndex: 1,
                             gameProvider: gameProvider,
                             isVertical: true,
+                            subtitle: gameProvider.gameMode == BatakGameMode.partner ? "RAKİP" : null,
                           ),
                         ),
                       ),
 
-                      // 3. SAĞ OYUNCU (Uğur)
+                      // 3. SAĞ OYUNCU (Uğur / Rakip)
                       Align(
                         alignment: Alignment.centerRight,
                         child: Padding(
@@ -259,6 +289,7 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
                             playerIndex: 3,
                             gameProvider: gameProvider,
                             isVertical: true,
+                            subtitle: gameProvider.gameMode == BatakGameMode.partner ? "RAKİP" : null,
                           ),
                         ),
                       ),
@@ -278,19 +309,26 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 6.0),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.75),
+                                    color: const Color(0xFF1E1710).withOpacity(0.92),
                                     borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: Colors.amber.withOpacity(0.5), width: 1),
+                                    border: Border.all(color: const Color(0xFFC9A04A).withOpacity(0.6), width: 1),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.4),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
                                   child: Text(
                                     gameProvider.statusMessage,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
-                                      color: Colors.amberAccent,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFFFFE082),
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
@@ -300,6 +338,7 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
                               playerIndex: 0,
                               gameProvider: gameProvider,
                               isMe: true,
+                              subtitle: gameProvider.gameMode == BatakGameMode.partner ? "BİZ" : null,
                             ),
                             const SizedBox(height: 2),
 
@@ -342,7 +381,7 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
                                       },
                                     ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 10),
                           ],
                         ),
                       ),
@@ -360,26 +399,35 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
               ),
             ),
 
-            // 2. REKLAM ALANI (Masanın dışında, Column en altında 60px - VIP ise gizli)
+            // 2. REKLAM ALANI (Masanın dışında, Column en altında 50px - VIP ise gizli)
             Consumer<StoreProvider>(
               builder: (context, store, child) {
                 if (store.isVip) {
                   return const SizedBox.shrink();
                 }
-                return Container(
-                  height: 60,
-                  width: double.infinity,
-                  color: Colors.black,
-                  alignment: Alignment.center,
-                  child: const Text(
-                    "REKLAM ALANI",
-                    style: TextStyle(
-                      color: Colors.white54,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2,
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Zarif ahşap masa kenarlığı (Reklam alanı ile çuha masayı dengeler)
+                    Container(
+                      height: 3,
+                      width: double.infinity,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Color(0xFF381504),
+                            Color(0xFFD4A373),
+                            Color(0xFF381504),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    Container(
+                      height: 50,
+                      width: double.infinity,
+                      color: const Color(0xFF0D0D0D),
+                    ),
+                  ],
                 );
               },
             ),
@@ -389,36 +437,118 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
     );
   }
 
+  Widget _buildTopBarButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    double iconSize = 20,
+    Color color = Colors.white,
+    String? tooltip,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1610).withOpacity(0.85),
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFF8B7355).withOpacity(0.5), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, color: color, size: iconSize),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrumpHudItem(GameProvider gameProvider, {bool compact = false}) {
+    if (gameProvider.currentPhase == GamePhase.bidding) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            compact ? "İh: " : "İhale: ",
+            style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 11, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            gameProvider.currentHighestBid > 0 ? "${gameProvider.currentHighestBid}" : "-",
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800),
+          ),
+        ],
+      );
+    }
+
+    if (gameProvider.currentPhase == GamePhase.trumpSelection) {
+      return const Text(
+        "Koz Seçimi",
+        style: TextStyle(color: Color(0xFFD4AF37), fontSize: 11, fontWeight: FontWeight.bold),
+      );
+    }
+
+    final suit = gameProvider.currentTrump;
+    final isRed = suit == Suit.hearts || suit == Suit.diamonds;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          compact ? "K: " : "Koz: ",
+          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 2),
+          child: CustomPaint(
+            size: const Size(12, 12),
+            painter: SuitIconPainter(
+              suit: suit,
+              color: isRed ? const Color(0xFFFF5252) : Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTableFeltBackground(TableColor color) {
     List<Color> gradientColors;
     switch (color) {
       case TableColor.blue:
         gradientColors = [
-          const Color(0xFF1E4C7A),
-          const Color(0xFF102E4C),
+          const Color(0xFF1B4268),
+          const Color(0xFF0F2B48),
           const Color(0xFF071524),
         ];
         break;
       case TableColor.red:
         gradientColors = [
-          const Color(0xFF7A1E2B),
-          const Color(0xFF4C1018),
-          const Color(0xFF24070B),
+          const Color(0xFF6E1824),
+          const Color(0xFF450E16),
+          const Color(0xFF22060A),
         ];
         break;
       case TableColor.dark:
         gradientColors = [
-          const Color(0xFF333333),
-          const Color(0xFF1F1F1F),
-          const Color(0xFF0A0A0A),
+          const Color(0xFF2B2B2B),
+          const Color(0xFF1A1A1A),
+          const Color(0xFF0D0D0D),
         ];
         break;
       case TableColor.green:
       default:
         gradientColors = [
-          const Color(0xFF1E6B2C),
-          const Color(0xFF124A1E),
-          const Color(0xFF092910),
+          const Color(0xFF1B5E3A),
+          const Color(0xFF14492B),
+          const Color(0xFF0B2416),
         ];
         break;
     }
@@ -427,7 +557,7 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
       decoration: BoxDecoration(
         gradient: RadialGradient(
           center: Alignment.center,
-          radius: 1.1,
+          radius: 1.15,
           colors: gradientColors,
         ),
       ),
@@ -446,22 +576,34 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.6),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.amber.withOpacity(0.5)),
+            color: const Color(0xFF16251C).withOpacity(0.95),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFC9A04A), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(color: Colors.amber, strokeWidth: 2.5),
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(color: Color(0xFFC9A04A), strokeWidth: 2.2),
               ),
               const SizedBox(height: 10),
               Text(
                 "${gameProvider.players[gameProvider.biddingTurnIndex].name} Düşünüyor...",
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Color(0xFFF6F1E4),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
               ),
             ],
           ),
@@ -475,53 +617,79 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
       );
     }
 
-    // Masadaki dev atılmış kartlar (Dinamik boyutlu)
-    double centerCardWidth = (screenSize.width * 0.18).clamp(78.0, 115.0);
-    double centerCardHeight = centerCardWidth * 1.48;
+    // Masadaki dev atılmış kartlar (Dinamik boyutlu, temiz ayrılmış yerleşim)
+    double centerCardWidth = (screenSize.width * 0.19).clamp(76.0, 108.0);
+    double centerCardHeight = centerCardWidth * 1.42;
+    double boxWidth = centerCardWidth * 2.3;
+    double boxHeight = centerCardHeight * 1.7;
 
     return SizedBox(
-      width: centerCardWidth * 2.6,
-      height: centerCardHeight * 1.9,
+      width: boxWidth,
+      height: boxHeight,
       child: Stack(
+        clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
           if (gameProvider.playedCardsByPlayer.containsKey(2)) // Üst (Arda)
             Positioned(
               top: 0,
-              child: RealisticPlayingCardWidget(
-                card: gameProvider.playedCardsByPlayer[2]!,
-                width: centerCardWidth,
-                height: centerCardHeight,
+              left: (boxWidth - centerCardWidth) / 2,
+              child: _buildCenterTrickCard(
+                gameProvider.playedCardsByPlayer[2]!,
+                centerCardWidth,
+                centerCardHeight,
               ),
             ),
           if (gameProvider.playedCardsByPlayer.containsKey(1)) // Sol (Erol)
             Positioned(
               left: 0,
-              child: RealisticPlayingCardWidget(
-                card: gameProvider.playedCardsByPlayer[1]!,
-                width: centerCardWidth,
-                height: centerCardHeight,
+              top: (boxHeight - centerCardHeight) / 2,
+              child: _buildCenterTrickCard(
+                gameProvider.playedCardsByPlayer[1]!,
+                centerCardWidth,
+                centerCardHeight,
               ),
             ),
           if (gameProvider.playedCardsByPlayer.containsKey(3)) // Sağ (Uğur)
             Positioned(
               right: 0,
-              child: RealisticPlayingCardWidget(
-                card: gameProvider.playedCardsByPlayer[3]!,
-                width: centerCardWidth,
-                height: centerCardHeight,
+              top: (boxHeight - centerCardHeight) / 2,
+              child: _buildCenterTrickCard(
+                gameProvider.playedCardsByPlayer[3]!,
+                centerCardWidth,
+                centerCardHeight,
               ),
             ),
           if (gameProvider.playedCardsByPlayer.containsKey(0)) // Alt (Siz)
             Positioned(
               bottom: 0,
-              child: RealisticPlayingCardWidget(
-                card: gameProvider.playedCardsByPlayer[0]!,
-                width: centerCardWidth,
-                height: centerCardHeight,
+              left: (boxWidth - centerCardWidth) / 2,
+              child: _buildCenterTrickCard(
+                gameProvider.playedCardsByPlayer[0]!,
+                centerCardWidth,
+                centerCardHeight,
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCenterTrickCard(PlayingCard card, double width, double height) {
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.45),
+            blurRadius: 8,
+            offset: const Offset(1, 3),
+          ),
+        ],
+      ),
+      child: RealisticPlayingCardWidget(
+        card: card,
+        width: width,
+        height: height,
       ),
     );
   }
@@ -544,37 +712,78 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
     bool isBidder = gameProvider.bidderIndex == playerIndex &&
         gameProvider.currentPhase != GamePhase.bidding;
 
+    final isTeamPartner = subtitle != null && subtitle.contains("BİZ");
+    final subtitleColor = isTeamPartner ? const Color(0xFF81D4FA) : const Color(0xFFFFAB91);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isTurn
-              ? [const Color(0xFFC47B2B), const Color(0xFF8B4715)]
-              : [const Color(0xFF8D4925), const Color(0xFF5D2E15)],
+              ? const [Color(0xFF382918), Color(0xFF26190C)]
+              : const [Color(0xFF221A14), Color(0xFF16100B)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isTurn ? Colors.amberAccent : const Color(0xFFD4A373),
-          width: isTurn ? 2.2 : 1.2,
+          color: isTurn ? const Color(0xFFC9A04A) : const Color(0xFF4A3728),
+          width: isTurn ? 1.8 : 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: isTurn ? Colors.amber.withOpacity(0.4) : Colors.black45,
+            color: isTurn ? const Color(0xFFC9A04A).withOpacity(0.3) : Colors.black45,
             blurRadius: isTurn ? 8 : 4,
-            offset: const Offset(1, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (isBidder)
-            const Padding(
-              padding: EdgeInsets.only(right: 5.0),
-              child: Icon(Icons.star, color: Colors.amberAccent, size: 14),
+          // Aktif sıra gösterge noktası
+          if (isTurn)
+            Container(
+              width: 6,
+              height: 6,
+              margin: const EdgeInsets.only(right: 6),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFC9A04A),
+                boxShadow: [
+                  BoxShadow(color: Color(0xFFFFD54F), blurRadius: 4, spreadRadius: 1),
+                ],
+              ),
             ),
+
+          // İhaleci Yıldızı & Teklif Rozeti
+          if (isBidder)
+            Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFC9A04A).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFFC9A04A), width: 0.8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.star, color: Color(0xFFD4AF37), size: 10),
+                  const SizedBox(width: 2),
+                  Text(
+                    "${gameProvider.currentHighestBid}",
+                    style: const TextStyle(
+                      color: Color(0xFFFFE082),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Oyuncu İsmi & Alt Başlık (Eş / Rakip)
           Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -583,30 +792,41 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
                 player.name.toUpperCase(),
                 style: TextStyle(
                   color: isTurn ? Colors.white : Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.8,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
                 ),
               ),
               if (subtitle != null)
                 Text(
                   subtitle,
-                  style: const TextStyle(color: Colors.cyanAccent, fontSize: 9, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: subtitleColor,
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
                 ),
             ],
           ),
           const SizedBox(width: 8),
+
+          // Alınan El Rozeti
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.black54,
-              borderRadius: BorderRadius.circular(6),
+              color: Colors.black.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(
+                color: isTurn ? const Color(0xFFC9A04A).withOpacity(0.5) : Colors.white10,
+                width: 0.8,
+              ),
             ),
             child: Text(
               "${player.tricksWon}",
-              style: const TextStyle(
-                color: Colors.amberAccent,
-                fontSize: 13,
+              style: TextStyle(
+                color: isTurn ? const Color(0xFFFFD54F) : Colors.white70,
+                fontSize: 11.5,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -615,20 +835,5 @@ class _BatakGameScreenState extends State<BatakGameScreen> {
       ),
     );
   }
-
-  String _getSuitSymbol(Suit s) {
-    switch (s) {
-      case Suit.spades: return "Maça ♠";
-      case Suit.hearts: return "Kupa ♥";
-      case Suit.diamonds: return "Karo ♦";
-      case Suit.clubs: return "Sinek ♣";
-    }
-  }
-
-  Color _getSuitColor(Suit s) {
-    if (s == Suit.hearts || s == Suit.diamonds) {
-      return const Color(0xFFFF5252);
-    }
-    return Colors.white;
-  }
 }
+

@@ -1,4 +1,4 @@
-package com.erkan.batakcipro
+package com.likyastudios.likyabatak
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -30,6 +30,8 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+**/build/
+**/.dart_tool/
 
 # Symbolication related
 app.*.symbols
@@ -42,37 +44,39 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Likya Batak - local/security exclusions
-.vscode/
-
-# Secrets / signing
-.env
-.env.local
-.env.*
-!.env.example
-android/key.properties
+# Keystore & Signing properties
+**/key.properties
 *.jks
 *.keystore
-*.pem
+.env
+.env.*
+credentials*
+service-account*
+**/credentials*
+**/service-account*
 *.p12
-credentials.json
-service-account.json
-service-account*.json
+*.pem
+*.key
 
-# Python backend
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.pytest_cache/
+# Android & Gradle local files
+.gradle/
+android/.gradle/
+**/local.properties
 
-# LikyaDevAI local data
-.likya_backups/
-.likya/
+# IDE temporary files
+.vscode/
+.idea/
+*.iml
 
-# Local captures
-test_capture.png
 
-# Generated Android packages
-*.apk
+
+# Generated visual previews
+artifacts/visual_checks/
+
+# Local caches, logs, and compiled release outputs
+**/cache/
+**/caches/
+**/logs/
 *.aab
+*.apk
+*.ipa

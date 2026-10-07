@@ -22,7 +22,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace "com.erkan.batakcipro"
+    namespace "com.likyastudios.likyabatak"
     compileSdk 36
     ndkVersion flutter.ndkVersion
 
@@ -36,8 +36,8 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.erkan.batakcipro"
-        minSdk 21
+        applicationId "com.likyastudios.likyabatak"
+        minSdk 24
         targetSdk 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

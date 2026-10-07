@@ -1,7 +1,7 @@
 # Likya Batak — Gizlilik Politikası
 
 **Son Güncelleme:** 1 Ekim 2026  
-**Uygulama:** Likya Batak (`com.erkan.batakcipro`)  
+**Uygulama:** Likya Batak (`com.likyastudios.likyabatak`)  
 
 Bu Gizlilik Politikası, **Likya Batak** mobil uygulamasının ("Uygulama") kullanıcılarının kişisel bilgilerinin nasıl toplandığını, kullanıldığını ve korunduğunu açıklamaktadır.
 
@@ -55,4 +55,4 @@ Bu Gizlilik Politikası zaman zaman güncellenebilir. Değişiklikler yayınland
 Verilerinizin silinmesini talep etmek veya sorularınız için:
 * **Geliştirici:** Erkan
 * **E-posta:** erkan.destek@gmail.com
-* **Paket Adı:** `com.erkan.batakcipro`
+* **Paket Adı:** `com.likyastudios.likyabatak`

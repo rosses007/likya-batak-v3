@@ -23,4 +23,15 @@ class PlayingCard {
   // Ekranda veya loglarda test ederken okunaklı görmek için
   @override
   String toString() => '${suit.name}-${rank.name}';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PlayingCard &&
+          runtimeType == other.runtimeType &&
+          suit == other.suit &&
+          rank == other.rank;
+
+  @override
+  int get hashCode => suit.hashCode ^ rank.hashCode;
 }
