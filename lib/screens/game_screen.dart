@@ -22,6 +22,15 @@ class BatakGameScreen extends StatefulWidget {
 
 class _BatakGameScreenState extends State<BatakGameScreen>
     with WidgetsBindingObserver {
+  bool _leaving = false;
+
+  Future<void> _leaveGame(GameProvider provider) async {
+    if (_leaving || !mounted) return;
+    _leaving = true;
+    await provider.autoSaveCurrentGame();
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -90,7 +99,9 @@ class _BatakGameScreenState extends State<BatakGameScreen>
       context: context,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
-        child: ScoreboardWidget(provider: provider),
+        child: SingleChildScrollView(
+          child: ScoreboardWidget(provider: provider),
+        ),
       ),
     );
   }
@@ -99,7 +110,13 @@ class _BatakGameScreenState extends State<BatakGameScreen>
   Widget build(BuildContext context) {
     Size screenSize = MediaQuery.of(context).size;
 
-    return Scaffold(
+    return PopScope<void>(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop && !_leaving) {
+          context.read<GameProvider>().autoSaveCurrentGame();
+        }
+      },
+      child: Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
@@ -162,7 +179,7 @@ class _BatakGameScreenState extends State<BatakGameScreen>
                             _buildTopBarButton(
                               icon: Icons.arrow_back_ios_new,
                               iconSize: 16,
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () => _leaveGame(gameProvider),
                               tooltip: 'Çıkış',
                             ),
 
@@ -354,8 +371,15 @@ class _BatakGameScreenState extends State<BatakGameScreen>
 
                       // 4. MASANIN ORTASI (İhale, Koz veya Atılan Dev Kartlar)
                       Center(
-                        child:
-                            _buildCenterArea(context, gameProvider, screenSize),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: screenSize.height * 0.48,
+                          ),
+                          child: SingleChildScrollView(
+                            child: _buildCenterArea(
+                                context, gameProvider, screenSize),
+                          ),
+                        ),
                       ),
 
                       // 5. KULLANICI ALANI (Durum Mesajı + Siz Paneli + Dev Kartlar)
@@ -456,7 +480,22 @@ class _BatakGameScreenState extends State<BatakGameScreen>
                         Container(
                           color: Colors.black54,
                           alignment: Alignment.center,
-                          child: ScoreboardWidget(provider: gameProvider),
+                          child: SingleChildScrollView(
+                            child: Center(
+                              child: ScoreboardWidget(provider: gameProvider),
+                            ),
+                          ),
+                        ),
+                      if (screenSize.width > screenSize.height &&
+                          gameProvider.currentPhase == GamePhase.bidding &&
+                          gameProvider.biddingTurnIndex == 0)
+                        Positioned(
+                          top: 58,
+                          right: 12,
+                          child: ElevatedButton(
+                            onPressed: gameProvider.userPassBid,
+                            child: const Text('PAS'),
+                          ),
                         ),
                     ],
                   );
@@ -494,6 +533,7 @@ class _BatakGameScreenState extends State<BatakGameScreen>
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -4,7 +4,17 @@ import '../models/player_model.dart';
 import '../models/leaderboard_user.dart';
 
 class ApiService {
-  static const String baseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://api.bataknoir.com');
+  static const String baseUrl = String.fromEnvironment('API_BASE_URL',
+      defaultValue: 'https://api.bataknoir.com');
+
+  static Uri endpoint(String path) {
+    final base = Uri.parse(baseUrl);
+    if (const bool.fromEnvironment('dart.vm.product') &&
+        base.scheme != 'https') {
+      throw StateError('Release API_BASE_URL must use HTTPS');
+    }
+    return base.resolve(path);
+  }
 
   /// Skorları backend'e gönderir
   static Future<void> saveMatchScore({
@@ -12,15 +22,17 @@ class ApiService {
     required List<Player> players,
     required int winnerIndex,
   }) async {
-    final url = Uri.parse('$baseUrl/matches/score');
     try {
+      final url = endpoint('/matches/score');
       await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'is_multiplayer': isMultiplayer,
           'winner_name': players[winnerIndex].name,
-          'players': players.map((p) => {'name': p.name, 'tricks': p.tricksWon}).toList(),
+          'players': players
+              .map((p) => {'name': p.name, 'tricks': p.tricksWon})
+              .toList(),
         }),
       );
     } catch (_) {}
@@ -28,8 +40,8 @@ class ApiService {
 
   /// Retrieves the leaderboard (top players) from the backend.
   static Future<List<LeaderboardUser>> getLeaderboard() async {
-    final url = Uri.parse('$baseUrl/leaderboard?limit=10');
     try {
+      final url = endpoint('/leaderboard?limit=10');
       final response = await http.get(url);
       if (response.statusCode == 200) {
         List<dynamic> data = jsonDecode(response.body);

@@ -62,15 +62,20 @@ class ScoreboardWidget extends StatelessWidget {
                 size: 22,
               ),
               const SizedBox(width: 8),
-              Text(
-                isMatchOver
-                    ? "MAÇ SONUCU"
-                    : "YAZBOZ · Tur ${provider.currentRound}/${provider.totalRounds}",
-                style: const TextStyle(
-                  color: _gold,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    isMatchOver
+                        ? "MAÇ SONUCU"
+                        : "YAZBOZ · Tur ${provider.currentRound}/${provider.totalRounds}",
+                    style: const TextStyle(
+                      color: _gold,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
                 ),
               ),
             ],

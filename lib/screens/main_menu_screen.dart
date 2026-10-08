@@ -70,6 +70,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       MaterialPageRoute(builder: (context) => const BatakGameScreen()),
     );
 
+    await provider.autoSaveCurrentGame();
     if (mounted) {
       _checkForSavedGame();
     }
@@ -137,6 +138,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       MaterialPageRoute(builder: (context) => const BatakGameScreen()),
     );
 
+    await provider.autoSaveCurrentGame();
     if (mounted) {
       _checkForSavedGame();
     }

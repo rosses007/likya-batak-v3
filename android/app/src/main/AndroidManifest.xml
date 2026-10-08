@@ -7,7 +7,9 @@
     <application
         android:label="Likya Batak"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:appCategory="game"
+        android:usesCleartextTraffic="false">
 
         <!-- AdMob App ID -->
         <meta-data

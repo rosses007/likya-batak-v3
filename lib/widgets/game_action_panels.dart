@@ -73,20 +73,26 @@ class BiddingKeypadWidget extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(width: 20, height: 1, color: _gold.withOpacity(0.5)),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  "İHALE VER",
-                  style: TextStyle(
-                    color: _gold,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
+              Expanded(child: Container(height: 1, color: _gold.withOpacity(0.5))),
+              const Flexible(
+                flex: 5,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      "İHALE VER",
+                      style: TextStyle(
+                        color: _gold,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
                   ),
                 ),
               ),
-              Container(width: 20, height: 1, color: _gold.withOpacity(0.5)),
+              Expanded(child: Container(height: 1, color: _gold.withOpacity(0.5))),
             ],
           ),
           const SizedBox(height: 10),

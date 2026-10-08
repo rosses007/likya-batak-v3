@@ -8,7 +8,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
 
@@ -19,7 +20,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    _fadeAnimation = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
+    _fadeAnimation =
+        CurvedAnimation(parent: _animController, curve: Curves.easeIn);
     _animController.forward();
 
     // 2.5 saniye sonra Ana Menüye geçiş
@@ -75,7 +77,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           ),
 
           // Alt tarafta zarif altın rengi yükleniyor göstergesi
-          FadeTransition(
+          SafeArea(
+              child: FadeTransition(
             opacity: _fadeAnimation,
             child: const Align(
               alignment: Alignment.bottomCenter,
@@ -89,7 +92,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE8A838)),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xFFE8A838)),
                       ),
                     ),
                     SizedBox(height: 12),
@@ -106,7 +110,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ),
               ),
             ),
-          ),
+          )),
         ],
       ),
     );

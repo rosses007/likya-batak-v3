@@ -3,6 +3,17 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 class WebSocketService {
+  static const String baseUrl = String.fromEnvironment('WS_BASE_URL',
+      defaultValue: 'wss://api.bataknoir.com/ws');
+
+  static Uri endpoint(String clientId) {
+    final base = Uri.parse(baseUrl);
+    if (const bool.fromEnvironment('dart.vm.product') && base.scheme != 'wss') {
+      throw StateError('Release WS_BASE_URL must use WSS');
+    }
+    return Uri.parse('$baseUrl/matchmaking/${Uri.encodeComponent(clientId)}');
+  }
+
   // Singleton pattern (Uygulamada tek bir instance olsun)
   static final WebSocketService _instance = WebSocketService._internal();
   factory WebSocketService() => _instance;
@@ -15,8 +26,7 @@ class WebSocketService {
 
   /// Sunucuya bağlanır ve client_id'yi iletir
   void connect(String clientId) {
-    const defaultEndpoint = String.fromEnvironment('WS_BASE_URL', defaultValue: 'wss://api.bataknoir.com/ws');
-    final wsUrl = Uri.parse('$defaultEndpoint/matchmaking/$clientId');
+    final wsUrl = endpoint(clientId);
     
     _channel = WebSocketChannel.connect(wsUrl);
     debugPrint("WebSocket bağlantısı başlatıldı: $clientId");
