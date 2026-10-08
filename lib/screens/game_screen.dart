@@ -338,37 +338,6 @@ class _BatakGameScreenState extends State<BatakGameScreen>
                         ),
                       ),
 
-                      if (dummyPlayer != null && dummyIndex == 2)
-                        Positioned(
-                          top: 92,
-                          left: 18,
-                          right: 18,
-                          child: ExposedDummyHand(
-                            hand: dummyPlayer.hand,
-                            isActive: canPlayDummy,
-                            sideSeat: false,
-                            validMoves: dummyValidMoves,
-                            onPlayCard: (card) =>
-                                gameProvider.playCard(dummyPlayer, card),
-                          ),
-                        ),
-                      if (dummyPlayer != null &&
-                          (dummyIndex == 1 || dummyIndex == 3))
-                        Positioned(
-                          top: screenSize.height * 0.28,
-                          left: dummyIndex == 1 ? 4 : null,
-                          right: dummyIndex == 3 ? 4 : null,
-                          width: 142,
-                          child: ExposedDummyHand(
-                            hand: dummyPlayer.hand,
-                            isActive: canPlayDummy,
-                            sideSeat: true,
-                            validMoves: dummyValidMoves,
-                            onPlayCard: (card) =>
-                                gameProvider.playCard(dummyPlayer, card),
-                          ),
-                        ),
-
                       // 4. MASANIN ORTASI (İhale, Koz veya Atılan Dev Kartlar)
                       Center(
                         child: ConstrainedBox(
@@ -474,6 +443,38 @@ class _BatakGameScreenState extends State<BatakGameScreen>
                           ],
                         ),
                       ),
+
+                      // Keep playable dummy cards above the center overlay.
+                      if (dummyPlayer != null && dummyIndex == 2)
+                        Positioned(
+                          top: 92,
+                          left: 18,
+                          right: 18,
+                          child: ExposedDummyHand(
+                            hand: dummyPlayer.hand,
+                            isActive: canPlayDummy,
+                            sideSeat: false,
+                            validMoves: dummyValidMoves,
+                            onPlayCard: (card) =>
+                                gameProvider.playCard(dummyPlayer, card),
+                          ),
+                        ),
+                      if (dummyPlayer != null &&
+                          (dummyIndex == 1 || dummyIndex == 3))
+                        Positioned(
+                          top: screenSize.height * 0.28,
+                          left: dummyIndex == 1 ? 4 : null,
+                          right: dummyIndex == 3 ? 4 : null,
+                          width: 142,
+                          child: ExposedDummyHand(
+                            hand: dummyPlayer.hand,
+                            isActive: canPlayDummy,
+                            sideSeat: true,
+                            validMoves: dummyValidMoves,
+                            onPlayCard: (card) =>
+                                gameProvider.playCard(dummyPlayer, card),
+                          ),
+                        ),
 
                       // EL BİTTİĞİNDE VEYA OYUN BİTTİĞİNDE OTOMATİK YAZBOZ POPUP'I
                       if (showScoreOverlay)

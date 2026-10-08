@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:batak_app/models/card_model.dart';
 import 'package:batak_app/providers/game_provider.dart';
 import 'package:batak_app/providers/store_provider.dart';
 import 'package:batak_app/screens/game_screen.dart';
@@ -8,8 +7,8 @@ import 'package:batak_app/services/api_service.dart';
 import 'package:batak_app/services/sound_service.dart';
 import 'package:batak_app/services/websocket_service.dart';
 import 'package:batak_app/widgets/exposed_dummy_hand.dart';
+import 'package:batak_app/widgets/realistic_playing_card.dart';
 import 'package:batak_app/widgets/fanned_hand_view.dart';
-import 'package:batak_app/widgets/game_action_panels.dart';
 import 'package:batak_app/widgets/scoreboard_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -130,12 +129,6 @@ void main() {
     const Size(844, 390),
     const Size(1280, 800),
   ];
-  final hand = <PlayingCard>[
-    for (final suit in Suit.values)
-      for (final rank in Rank.values)
-        PlayingCard(suit: suit, rank: rank),
-  ];
-
   for (final size in sizes) {
     for (final scale in [1.0, 1.3, 1.5]) {
       testWidgets(
@@ -178,67 +171,89 @@ void main() {
   for (final size in sizes) {
     for (final scale in [1.0, 1.3, 1.5]) {
       testWidgets(
-          'PAS, 8+5/8+8 hand and dummy at ${size.width.toInt()}x${size.height.toInt()} / $scale',
+          'real screen PAS, 13/16 cards, human dummy at ${size.width.toInt()}x${size.height.toInt()} / $scale',
           (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        SoundService.soundEnabled = false;
+        final game = GameProvider()..gameMode = BatakGameMode.partner;
+        game.startNewGame();
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
 
-        await tester.pumpWidget(MaterialApp(
-          home: MediaQuery(
-            data: MediaQueryData(
-              size: size,
-              padding: const EdgeInsets.only(top: 24, bottom: 24),
-              textScaler: TextScaler.linear(scale),
-            ),
-            child: Scaffold(
-              body: SafeArea(
-                child: SingleChildScrollView(
-                  child: Column(children: [
-                    BiddingKeypadWidget(
-                      currentHighestBid: 5,
-                      onBidSelected: (_) {},
-                      onPass: () {},
-                    ),
-                    SizedBox(
-                      width: size.width - 16,
-                      child: FannedHandView(
-                        hand: hand.take(13).toList(),
-                        isMyTurn: true,
-                        isCardValid: (_) => true,
-                        onPlayCard: (_) {},
-                      ),
-                    ),
-                    SizedBox(
-                      width: size.width - 16,
-                      child: FannedHandView(
-                        hand: hand.take(16).toList(),
-                        isMyTurn: true,
-                        isCardValid: (_) => true,
-                        onPlayCard: (_) {},
-                      ),
-                    ),
-                    SizedBox(
-                      width: size.width - 36,
-                      child: ExposedDummyHand(
-                        hand: hand.take(13).toList(),
-                        isActive: true,
-                        sideSeat: false,
-                        validMoves: hand.take(13).toSet(),
-                        onPlayCard: (_) {},
-                      ),
-                    ),
-                  ]),
-                ),
+        await tester.pumpWidget(MultiProvider(
+          providers: [
+            ChangeNotifierProvider<GameProvider>.value(value: game),
+            ChangeNotifierProvider<StoreProvider>(create: (_) => _VipStore()),
+          ],
+          child: MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(scale),
+                padding: const EdgeInsets.only(top: 24, bottom: 24),
               ),
+              child: child!,
             ),
+            home: const BatakGameScreen(),
           ),
         ));
+        await tester.pump();
+        expect(find.byType(BatakGameScreen), findsOneWidget);
+        expect(find.text('PAS').hitTestable(), findsWidgets);
+        expect(tester.takeException(), isNull);
 
-        final pass = find.text('PAS');
-        expect(pass, findsOneWidget);
-        expect(tester.getSize(pass).height, greaterThan(0));
-        // Render errors are reported by the test binding with their widget path.
+        // Switch the same real screen to a human-controlled playing turn.
+        game.currentPhase = GamePhase.playing;
+        game.bidderIndex = 0;
+        game.currentTurnIndex = 0;
+        game.notifyListeners();
+        await tester.pump();
+        final ownHand = find.descendant(
+          of: find.byType(FannedHandView),
+          matching: find.byType(RealisticPlayingCardWidget),
+        );
+        final topLayer = find.byWidgetPredicate((widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith('top_'));
+        final bottomLayer = find.byWidgetPredicate((widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith('bottom_'));
+        expect(ownHand, findsNWidgets(13));
+        expect(topLayer, findsNWidgets(8));
+        expect(bottomLayer, findsNWidgets(5));
+        expect(find.byType(ExposedDummyHand), findsOneWidget);
+        expect(ownHand.last.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        // A 16-card hand is a layout stress state, not a dealt game state.
+        game.players[0].hand.addAll(game.players[1].hand.take(3).toList());
+        game.players[1].hand.removeRange(0, 3);
+        game.notifyListeners();
+        await tester.pump();
+        expect(ownHand, findsNWidgets(16));
+        expect(topLayer, findsNWidgets(8));
+        expect(bottomLayer, findsNWidgets(8));
+        expect(ownHand.last.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        // Human declarer controls the exposed partner hand on partner's turn.
+        game.currentTurnIndex = 2;
+        game.notifyListeners();
+        await tester.pump();
+        final dummy = tester.widget<ExposedDummyHand>(find.byType(ExposedDummyHand));
+        expect(dummy.isActive, isTrue);
+        expect(dummy.validMoves, isNotEmpty);
+        final dummyCards = find.descendant(
+          of: find.byType(ExposedDummyHand),
+          matching: find.byType(RealisticPlayingCardWidget),
+        );
+        expect(dummyCards, findsNWidgets(13));
+        expect(dummyCards.last.hitTestable(), findsOneWidget);
+        await tester.tap(dummyCards.last);
+        await tester.pump();
+        expect(game.players[2].hand, hasLength(12));
+        expect(tester.takeException(), isNull);
+        game.dispose();
       });
     }
   }
